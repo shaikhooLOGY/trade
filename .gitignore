@@ -1,19 +1,31 @@
-# Logs
+# Environment Files (Production-Safe)
+.env
+*.env
+.env.local
+.env.development
+.env.production
+
+# Logs & Storage
 logs/
 *.log
+storage/
+backups/
 
-# Reports & Backups
+# Dependencies
+vendor/
+node_modules/
+
+# Reports & Uploads (except documentation)
 /reports/*
 !/reports/README.md
-/backups/*
-/uploads/*
+uploads/
 
 # Environment Files
 .env
 .env.*
 .env.local
 
-# Cache Directories
+# Cache & Temp
 cache/
 tmp/
 temp/
@@ -21,6 +33,7 @@ temp/
 # Database
 *.sqlite
 *.db
+*.sql
 
 # System Files
 .DS_Store
@@ -35,4 +48,3 @@ Thumbs.db
 # Build Artifacts
 dist/
 build/
-*.zip

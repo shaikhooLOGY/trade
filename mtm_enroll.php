@@ -3,10 +3,9 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-$csrf = $_SESSION['csrf_token'];
+// Use unified CSRF helper
+require_once __DIR__ . '/includes/security/csrf_unify.php';
+$csrf = get_csrf_token();
 ?>
 <?php
 /**
@@ -15,10 +14,8 @@ $csrf = $_SESSION['csrf_token'];
  * Simple form to enroll in MTM models
  */
 
-// Include required files
+// Include required files - bootstrap.php now handles all dependencies
 require_once __DIR__ . '/includes/bootstrap.php';
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/includes/functions.php';
 require_once __DIR__ . '/includes/guard.php';
 
 // Include MTM modules

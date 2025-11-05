@@ -1,9 +1,12 @@
 <?php
 /**
  * MTM Validation Module
- * 
+ *
  * Provides input validation functions for TMS-MTM module
  */
+
+// Include unified CSRF helpers
+require_once __DIR__ . '/../security/csrf_unify.php';
 
 if (!function_exists('validate_enroll_input')) {
     /**
@@ -28,7 +31,7 @@ if (!function_exists('validate_enroll_input')) {
         }
         
         // Validate CSRF token
-        if (!isset($input['csrf_token']) || !csrf_verify($input['csrf_token'])) {
+        if (!isset($input['csrf_token']) || !validate_csrf($input['csrf_token'])) {
             $errors['csrf_token'] = 'Invalid CSRF token';
         }
         
@@ -92,7 +95,7 @@ if (!function_exists('validate_trade_input')) {
         }
         
         // Validate CSRF token for POST requests
-        if (!isset($input['csrf_token']) || !csrf_verify($input['csrf_token'])) {
+        if (!isset($input['csrf_token']) || !validate_csrf($input['csrf_token'])) {
             $errors['csrf_token'] = 'Invalid CSRF token';
         }
         

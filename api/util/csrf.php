@@ -1,14 +1,20 @@
 <?php
+/**
+ * api/util/csrf.php
+ *
+ * CSRF Utility API - Get CSRF token
+ * GET /api/util/csrf.php
+ */
+
 require_once __DIR__ . '/../../includes/bootstrap.php';
-require_once __DIR__ . '/../../config.php';
-require_once __DIR__ . '/../../includes/functions.php';
-require_once __DIR__ . '/../../includes/guard.php';
 
 header('Content-Type: application/json');
-require_login();
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Require authentication
+require_login_json();
 
-echo json_encode(['csrf_token' => $_SESSION['csrf_token'] ?? '']);
+// Check CSRF for API endpoints
+csrf_api_middleware();
+
+// Return CSRF token using the unified shim
+json_ok(['csrf' => get_csrf_token()], 'CSRF token retrieved successfully');

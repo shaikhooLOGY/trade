@@ -55,18 +55,34 @@ if (!function_exists('flash_get')) {
 }
 
 /* --------------------------------
-   CSRF
+   CSRF (Unified via csrf_unify.php)
 ----------------------------------- */
 if (!function_exists('csrf_token')) {
     function csrf_token(): string {
-        if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
-        return $_SESSION['csrf'];
+        // Use unified CSRF helper - require the unify file if not already loaded
+        static $loaded = false;
+        if (!$loaded) {
+            $csrfUnifyPath = __DIR__ . '/includes/security/csrf_unify.php';
+            if (file_exists($csrfUnifyPath)) {
+                require_once $csrfUnifyPath;
+            }
+            $loaded = true;
+        }
+        return get_csrf_token();
     }
 }
 if (!function_exists('csrf_verify')) {
     function csrf_verify($token): bool {
-        if (!isset($_SESSION['csrf']) || !is_string($token)) return false;
-        return hash_equals($_SESSION['csrf'], (string)$token);
+        // Use unified CSRF helper - require the unify file if not already loaded
+        static $loaded = false;
+        if (!$loaded) {
+            $csrfUnifyPath = __DIR__ . '/includes/security/csrf_unify.php';
+            if (file_exists($csrfUnifyPath)) {
+                require_once $csrfUnifyPath;
+            }
+            $loaded = true;
+        }
+        return validate_csrf($token);
     }
 }
 
