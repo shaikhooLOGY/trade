@@ -1,0 +1,8 @@
+RewriteEngine On
+# Force HTTPS
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Optional: redirect host to tradersclub.shaikhoology.com
+# RewriteCond %{HTTP_HOST} !^tradersclub\.shaikhoology\.com$ [NC]
+# RewriteRule ^ https://tradersclub.shaikhoology.com%{REQUEST_URI} [L,R=301]

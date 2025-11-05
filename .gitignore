@@ -1,0 +1,38 @@
+# Logs
+logs/
+*.log
+
+# Reports & Backups
+/reports/*
+!/reports/README.md
+/backups/*
+/uploads/*
+
+# Environment Files
+.env
+.env.*
+.env.local
+
+# Cache Directories
+cache/
+tmp/
+temp/
+
+# Database
+*.sqlite
+*.db
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build Artifacts
+dist/
+build/
+*.zip
