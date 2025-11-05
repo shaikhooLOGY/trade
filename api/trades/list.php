@@ -8,7 +8,7 @@
  * Get trade history for the authenticated trader with optional filtering
  */
 
-require_once __DIR__ . '/../../_bootstrap.php';
+require_once __DIR__ . '/../_bootstrap.php';
 
 header('Content-Type: application/json');
 

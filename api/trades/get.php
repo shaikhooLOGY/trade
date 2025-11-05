@@ -8,7 +8,7 @@
  * Get a single trade by ID (owner or admin only)
  */
 
-require_once __DIR__ . '/../../_bootstrap.php';
+require_once __DIR__ . '/../_bootstrap.php';
 
 header('Content-Type: application/json');
 

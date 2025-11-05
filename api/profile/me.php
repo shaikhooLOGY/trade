@@ -6,7 +6,7 @@
  * GET /api/profile/me.php
  */
 
-require_once __DIR__ . '/../../_bootstrap.php';
+require_once __DIR__ . '/../_bootstrap.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
