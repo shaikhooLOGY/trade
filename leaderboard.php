@@ -1,9 +1,7 @@
 <?php
 // leaderboard.php — compact awards + responsive, scrollable stats
-require_once __DIR__ . '/guard.php';
-require_once __DIR__ . '/config.php';
-
-if (session_status() === PHP_SESSION_NONE) session_start();
+// Session and security handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function name_fallback($name, $email){

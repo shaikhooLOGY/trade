@@ -1,7 +1,6 @@
 <?php
 // admin/trade_concerns.php
-require_once __DIR__ . '/../config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/../includes/bootstrap.php';
 if (empty($_SESSION['is_admin'])) { header('HTTP/1.1 403'); exit('Access denied'); }
 
 function has_col(mysqli $db, string $t, string $c): bool {
@@ -16,11 +15,7 @@ $hasStatus      = has_col($mysqli,'trade_concerns','status');
 $hasProcessedBy = has_col($mysqli,'trade_concerns','processed_by');
 $hasProcessedAt = has_col($mysqli,'trade_concerns','processed_at');
 
-if (empty($_SESSION['admin_csrf'])) {
-  try { $_SESSION['admin_csrf']=bin2hex(random_bytes(32)); }
-  catch(Exception $e){ $_SESSION['admin_csrf']=bin2hex(openssl_random_pseudo_bytes(32)); }
-}
-$csrf = $_SESSION['admin_csrf'];
+$csrf = get_csrf_token();
 
 $view = strtolower($_GET['view'] ?? 'pending');
 if(!in_array($view,['all','pending','resolved'],true)) $view='pending';

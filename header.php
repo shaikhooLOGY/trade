@@ -1,7 +1,6 @@
 <?php
-require_once __DIR__ . '/includes/env.php';   // defines APP_ENV + loads .env
-require_once __DIR__ . '/config.php';         // connects DB, defines guards
-require_once __DIR__ . '/includes/bootstrap.php'; // session start, headers, csrf
+// Single include - bootstrap.php now handles all dependencies
+require_once __DIR__ . '/includes/bootstrap.php';
 ?>
 <!doctype html>
 <html lang="en">
@@ -227,7 +226,7 @@ require_once __DIR__ . '/includes/bootstrap.php'; // session start, headers, csr
   $isAdmin   = !empty($_SESSION['is_admin']);
   $username  = $isLogged ? ($_SESSION['username'] ?? 'Member') : 'Guest';
   $isActive  = $isLogged && ($emailVer === 1) && in_array($status, ['active','approved'], true);
-  $showFullNav = (!empty($_SESSION['user_id'])) && ($isActive || APP_ENV === 'local' || !empty($_SESSION['is_admin']));
+  $showFullNav = (!empty($_SESSION['user_id'])) && ($isActive || getenv('APP_ENV') === 'local' || !empty($_SESSION['is_admin']));
   $cur = strtolower(basename(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH)));
 
   function nav($href,$label,$cur,$names){
@@ -272,9 +271,7 @@ require_once __DIR__ . '/includes/bootstrap.php'; // session start, headers, csr
   </div>
 <?php endif; ?>
 
-<?php if(!empty($_SESSION['flash'])): ?>
-  <div style="background:#dcfce7;border:1px solid #14532d;color:#14532d;
-              padding:12px;text-align:center;font-weight:600;margin:0;">
-    <?= htmlspecialchars($_SESSION['flash']); unset($_SESSION['flash']); ?>
-  </div>
-<?php endif; ?>
+<?php
+// Flash messages are now handled by bootstrap.php's flash_out() function
+// Call flash_out() where needed to display messages
+?>

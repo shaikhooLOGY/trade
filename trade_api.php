@@ -1,7 +1,8 @@
 <?php
-// trade_api.php
-require_once 'config.php';   // provides $mysqli and session_start()
-require_once 'functions.php'; // compute_points_from_trade
+// trade_api.php - API endpoint for trade operations
+// Dependencies via bootstrap.php, no session needed for API calls
+require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/functions.php'; // compute_points_from_trade
 
 header('Content-Type: application/json; charset=utf-8');
 

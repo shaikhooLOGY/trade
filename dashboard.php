@@ -1,12 +1,8 @@
 <?php
 // Trading Dashboard - matches site style with complete trade data
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/guard.php';
-require_once __DIR__ . '/functions.php'; // canonical loader
+// Session and CSRF handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 require_once __DIR__ . '/system/mtm_verifier.php';
-
-if (session_status() === PHP_SESSION_NONE) session_start();
-if (empty($_SESSION['csrf'])) { $_SESSION['csrf'] = bin2hex(random_bytes(32)); }
 
 // Local helpers
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
@@ -51,7 +47,7 @@ $user_id = (int)($_SESSION['user_id'] ?? 0);
 if (!$user_id) { header('Location: /login.php'); exit; }
 
 // ---------- POST actions ----------
-if ($_SERVER['REQUEST_METHOD']==='POST' && !empty($_POST['csrf']) && hash_equals($_SESSION['csrf'], $_POST['csrf'])) {
+if ($_SERVER['REQUEST_METHOD']==='POST' && validate_csrf($_POST['csrf'] ?? '')) {
     $act = $_POST['action'] ?? '';
     $tid = (int)($_POST['trade_id'] ?? 0);
 

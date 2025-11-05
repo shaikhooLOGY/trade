@@ -1195,7 +1195,7 @@ function pasteFromClipboard() {
 // ----- Health Checks -----
 function checkHealth() {
     const healthToken = '<?= h($GLOBALS['HEALTH_TOKEN'] ?? '') ?>';
-    const healthUrl = healthToken ? `/health.php?token=${encodeURIComponent(healthToken)}` : '/health.php';
+    const healthUrl = healthToken ? `/api/health.php?token=${encodeURIComponent(healthToken)}` : '/api/health.php';
     
     fetch(healthUrl)
         .then(response => {

@@ -1,7 +1,6 @@
 <?php
 // admin/mtm_verify.php — MTM Verifier (per user / per model / per task) with dry-run if tables missing
-require_once __DIR__ . '/../config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/../includes/bootstrap.php';
 
 $is_admin = !empty($_SESSION['is_admin']);
 $me_id    = (int)($_SESSION['user_id'] ?? 0);

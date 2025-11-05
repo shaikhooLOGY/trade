@@ -1,9 +1,6 @@
 <?php
 // Enhanced Dashboard Export to PDF
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/functions.php';
-
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/includes/bootstrap.php';
 if (empty($_SESSION['user_id'])) {
     header('HTTP/1.0 401 Unauthorized');
     exit('Unauthorized');

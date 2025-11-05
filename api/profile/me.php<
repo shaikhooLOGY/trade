@@ -1,0 +1,284 @@
+<?php
+/**
+ * api/profile/me.php
+ * 
+ * Profile API - Get current user profile
+ * GET /api/profile/me.php
+ */
+
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+
+// Handle preflight requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+// Bootstrap the application
+require_once __DIR__ . '/../../includes/bootstrap.php';
+
+// Include security components
+require_once __DIR__ . '/../../includes/security/csrf.php';
+require_once __DIR__ . '/../../includes/security/ratelimit.php';
+require_once __DIR__ . '/../../includes/http/json.php';
+
+// Feature gating - check if APIs are enabled
+if (!getenv('APP_FEATURE_APIS') || getenv('APP_FEATURE_APIS') !== '1') {
+    json_fail('FEATURE_OFF', 'Feature disabled');
+}
+
+// Only allow GET requests
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    json_fail('METHOD_NOT_ALLOWED', 'Only GET method is allowed');
+}
+
+// Apply rate limiting (GET requests)
+rate_limit_api_middleware('profile_me', (int)getenv('RATE_LIMIT_GET', 120));
+
+try {
+    // Require authentication
+    $user = require_login_json();
+    $userId = (int)$user['id'];
+    $isAdmin = isset($user['role']) && $user['role'] === 'admin';
+    
+    // Check CSRF for API endpoints
+    csrf_api_middleware();
+    
+    global $mysqli;
+    
+    // Get comprehensive user profile
+    $stmt = $mysqli->prepare("
+        SELECT 
+            u.id,
+            u.name,
+            COALESCE(u.display_name, u.name) as display_name,
+            u.email,
+            u.status,
+            u.role,
+            u.email_verified,
+            u.registration_date,
+            u.last_login,
+            u.profile_completion_score,
+            u.avatar_url,
+            u.bio,
+            u.location,
+            u.timezone,
+            u.preferences,
+            u.created_at,
+            u.updated_at,
+            u.last_password_change,
+            -- Count user activities
+            (SELECT COUNT(*) FROM trades WHERE trader_id = u.id OR user_id = u.id) as total_trades,
+            (SELECT COUNT(*) FROM mtm_enrollments WHERE user_id = u.id) as total_enrollments,
+            (SELECT COUNT(*) FROM mtm_enrollments WHERE user_id = u.id AND status = 'approved') as approved_enrollments,
+            (SELECT COUNT(*) FROM mtm_enrollments WHERE user_id = u.id AND status = 'pending') as pending_enrollments
+        FROM users u
+        WHERE u.id = ?
+        LIMIT 1
+    ");
+    
+    if (!$stmt) {
+        throw new Exception('Failed to prepare profile query');
+    }
+    
+    $stmt->bind_param('i', $userId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $profile = $result->fetch_assoc();
+    $stmt->close();
+    
+    if (!$profile) {
+        json_not_found('User profile');
+    }
+    
+    // Calculate user statistics if they have trades
+    $tradeStats = null;
+    if ($profile['total_trades'] > 0) {
+        require_once __DIR__ . '/../../includes/trades/service.php';
+        $tradeStats = calculate_trade_metrics_service($userId);
+    }
+    
+    // Get recent MTM activity
+    $recentActivity = [];
+    try {
+        $stmt = $mysqli->prepare("
+            SELECT 
+                e.id as enrollment_id,
+                e.model_id,
+                m.name as model_name,
+                e.status,
+                e.created_at,
+                e.approved_at,
+                e.rejection_reason
+            FROM mtm_enrollments e
+            INNER JOIN mtm_models m ON m.id = e.model_id
+            WHERE e.user_id = ?
+            ORDER BY e.created_at DESC
+            LIMIT 10
+        ");
+        
+        if ($stmt) {
+            $stmt->bind_param('i', $userId);
+            $stmt->execute();
+            $activityResult = $stmt->get_result();
+            
+            while ($activity = $activityResult->fetch_assoc()) {
+                $recentActivity[] = [
+                    'enrollment_id' => (int)$activity['enrollment_id'],
+                    'model_id' => (int)$activity['model_id'],
+                    'model_name' => $activity['model_name'],
+                    'status' => $activity['status'],
+                    'created_at' => $activity['created_at'],
+                    'approved_at' => $activity['approved_at'],
+                    'rejection_reason' => $activity['rejection_reason']
+                ];
+            }
+            $stmt->close();
+        }
+    } catch (Exception $e) {
+        app_log('error', 'Profile me - recent activity query failed: ' . $e->getMessage());
+    }
+    
+    // Get security-related information (masked)
+    $securityInfo = [
+        'last_login' => $profile['last_login'],
+        'email_verified' => (bool)$profile['email_verified'],
+        'last_password_change' => $profile['last_password_change'],
+        'status' => $profile['status']
+    ];
+    
+    // Parse preferences if available
+    $preferences = null;
+    if (!empty($profile['preferences'])) {
+        $decodedPreferences = json_decode($profile['preferences'], true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            $preferences = $decodedPreferences;
+        }
+    }
+    
+    // Build complete profile response
+    $response = [
+        'id' => (int)$profile['id'],
+        'name' => $profile['name'],
+        'display_name' => $profile['display_name'],
+        'email' => $profile['email'],
+        'role' => $profile['role'],
+        'status' => $profile['status'],
+        'email_verified' => (bool)$profile['email_verified'],
+        'created_at' => $profile['registration_date'],
+        'updated_at' => $profile['updated_at'],
+        'profile_completion_score' => (int)$profile['profile_completion_score'],
+        'avatar_url' => $profile['avatar_url'],
+        'bio' => $profile['bio'],
+        'location' => $profile['location'],
+        'timezone' => $profile['timezone'],
+        'preferences' => $preferences,
+        
+        // Statistics
+        'stats' => [
+            'total_trades' => (int)$profile['total_trades'],
+            'total_enrollments' => (int)$profile['total_enrollments'],
+            'approved_enrollments' => (int)$profile['approved_enrollments'],
+            'pending_enrollments' => (int)$profile['pending_enrollments']
+        ]
+    ];
+    
+    // Add trade statistics if available
+    if ($tradeStats) {
+        $response['stats'] = array_merge($response['stats'], $tradeStats);
+    }
+    
+    // Add recent activity
+    $response['recent_activity'] = $recentActivity;
+    
+    // Add security info
+    $response['security'] = $securityInfo;
+    
+    // Add admin-only information if user is admin
+    if ($isAdmin) {
+        $response['admin_info'] = [
+            'can_approve_users' => true,
+            'can_manage_models' => true,
+            'can_view_all_trades' => true,
+            'permissions' => [
+                'manage_users',
+                'manage_models', 
+                'manage_trades',
+                'view_analytics'
+            ]
+        ];
+        
+        // Get admin-specific stats
+        try {
+            $adminStats = [
+                'total_users' => 0,
+                'active_users' => 0,
+                'pending_users' => 0,
+                'total_models' => 0,
+                'active_models' => 0
+            ];
+            
+            $stmt = $mysqli->prepare("SELECT COUNT(*) as count FROM users");
+            if ($stmt) {
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $adminStats['total_users'] = (int)$result->fetch_assoc()['count'];
+                $stmt->close();
+            }
+            
+            $stmt = $mysqli->prepare("SELECT COUNT(*) as count FROM users WHERE status IN ('active', 'approved')");
+            if ($stmt) {
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $adminStats['active_users'] = (int)$result->fetch_assoc()['count'];
+                $stmt->close();
+            }
+            
+            $stmt = $mysqli->prepare("SELECT COUNT(*) as count FROM users WHERE email_verified = 1 AND status = 'pending'");
+            if ($stmt) {
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $adminStats['pending_users'] = (int)$result->fetch_assoc()['count'];
+                $stmt->close();
+            }
+            
+            $stmt = $mysqli->prepare("SELECT COUNT(*) as count FROM mtm_models");
+            if ($stmt) {
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $adminStats['total_models'] = (int)$result->fetch_assoc()['count'];
+                $stmt->close();
+            }
+            
+            $stmt = $mysqli->prepare("SELECT COUNT(*) as count FROM mtm_models WHERE status = 'active'");
+            if ($stmt) {
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $adminStats['active_models'] = (int)$result->fetch_assoc()['count'];
+                $stmt->close();
+            }
+            
+            $response['admin_stats'] = $adminStats;
+            
+        } catch (Exception $e) {
+            app_log('error', 'Profile me - admin stats query failed: ' . $e->getMessage());
+        }
+    }
+    
+    // Log profile access
+    app_log('info', sprintf(
+        'Profile accessed - User: %d, Admin: %s',
+        $userId,
+        $isAdmin ? 'Yes' : 'No'
+    ));
+    
+    // Return success response
+    json_ok($response, 'Profile retrieved successfully');
+    
+} catch (Exception $e) {
+    app_log('error', 'Profile me error: ' . $e->getMessage());
+    json_fail('SERVER_ERROR', 'Failed to retrieve user profile');
+}

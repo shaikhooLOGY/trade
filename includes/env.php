@@ -8,7 +8,7 @@
 if (!defined('APP_ENV')) {
     $appEnv = 'local'; // default if .env missing
 
-    $envFile = __DIR__ . '/.env';
+    $envFile = __DIR__ . '/../.env';
     if (is_readable($envFile)) {
         $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {
@@ -24,6 +24,8 @@ if (!defined('APP_ENV')) {
                     $_ENV[$key] = $value;
                     $_SERVER[$key] = $value;
                     $GLOBALS[$key] = $value;
+                    // Also set in actual process environment for getenv()
+                    putenv("$key=$value");
                 }
             }
         }

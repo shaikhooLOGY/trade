@@ -1,9 +1,6 @@
 <?php
 // trade_edit.php — PRODUCTION VERSION - Compatible and Stable
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/guard.php';
-
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/includes/bootstrap.php';
 
 if (empty($_SESSION['user_id'])) { header('Location: /login.php'); exit; }
 $uid = (int)$_SESSION['user_id'];
@@ -104,7 +101,7 @@ if ($isClosed && $isLocked) {
 $errors = [];
 $saved  = false;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['csrf']) && hash_equals($_SESSION['csrf'], $_POST['csrf'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && validate_csrf($_POST['csrf'] ?? '')) {
     // symbol & entry are fixed
     $symbol           = $trade['symbol'];
     $entry_price_f    = (float)$trade['entry_price'];
@@ -434,7 +431,7 @@ label{font-weight:700;margin:8px 0 4px;display:block}
         <h2 style="margin:0 0 16px 0">✏️ Edit Trade — <?=h($symbol)?></h2>
 
         <form method="post">
-            <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+            <input type="hidden" name="csrf" value="<?= h(get_csrf_token()) ?>">
             
             <div class="row">
                 <div>

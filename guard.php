@@ -1,6 +1,7 @@
 <?php
 // guard.php — gatekeeper for verified & approved users (with safe public-page bypass)
-if (session_status() === PHP_SESSION_NONE) session_start();
+// Session and security handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 /*
 |--------------------------------------------------------------------------

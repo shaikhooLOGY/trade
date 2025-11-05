@@ -1,15 +1,14 @@
 <?php
 // admin/trade_center.php — Trade Center v4.1 (filters fixed + diag + opcache flush)
-require_once __DIR__ . '/../config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/../includes/bootstrap.php';
 
 if (empty($_SESSION['is_admin'])) { header('HTTP/1.1 403 Forbidden'); exit('Admins only.'); }
 
 /* ---------- quick utilities ---------- */
 $VERSION = 'v4.1';
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
-function csrf_token(){ if (empty($_SESSION['csrf'])) $_SESSION['csrf']=bin2hex(random_bytes(32)); return $_SESSION['csrf']; }
-function csrf_verify($t){ return isset($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], (string)$t); }
+function csrf_token(){ return get_csrf_token(); }
+function csrf_verify($t){ return validate_csrf((string)$t); }
 function flash_set($m){ $_SESSION['flash']=(string)$m; }
 function flash_pop(){ $m=$_SESSION['flash']??''; if($m!=='') unset($_SESSION['flash']); return $m; }
 $admin_id = (int)($_SESSION['user_id'] ?? 0);

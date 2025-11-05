@@ -1,7 +1,6 @@
 <?php
 // admin/trade_concerns_action.php
-require_once __DIR__ . '/../config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/../includes/bootstrap.php';
 
 // must be admin
 if (empty($_SESSION['is_admin'])) {
@@ -11,7 +10,7 @@ if (empty($_SESSION['is_admin'])) {
 
 // CSRF
 $csrf = $_POST['csrf'] ?? '';
-if (!hash_equals($_SESSION['admin_csrf'] ?? '', $csrf)) {
+if (!validate_csrf($csrf)) {
   exit('Bad CSRF');
 }
 

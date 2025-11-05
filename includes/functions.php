@@ -1,11 +1,7 @@
 <?php
 // includes/functions.php
 // Common helpers for Shaikhoology (idempotent, safe to re-include)
-
-if (session_status() === PHP_SESSION_NONE) {
-    // bootstrap normally starts session; this is defensive
-    session_start();
-}
+// Session management and core functions are now in bootstrap.php
 
 /* --------------------------------
    DB handle (prefers $GLOBALS['mysqli'])
@@ -13,13 +9,7 @@ if (session_status() === PHP_SESSION_NONE) {
 if (!function_exists('load_db')) {
     function load_db() {
         if (!empty($GLOBALS['mysqli'])) return $GLOBALS['mysqli'];
-        if (file_exists(__DIR__ . '/config.php')) {
-            require_once __DIR__ . '/config.php';
-        } elseif (file_exists(__DIR__ . '/../includes/config.php')) {
-            require_once __DIR__ . '/../includes/config.php';
-        } elseif (file_exists(__DIR__ . '/../config.php')) {
-            require_once __DIR__ . '/../config.php';
-        }
+        // Config should already be loaded via bootstrap.php
         return $GLOBALS['mysqli'] ?? null;
     }
 }
@@ -27,16 +17,13 @@ if (!function_exists('load_db')) {
 /* --------------------------------
    Escaping / HTML helpers
 ----------------------------------- */
-if (!function_exists('h')) {
-    function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
-}
+// h() function moved to bootstrap.php, keep esc() for backward compatibility
 if (!function_exists('esc')) {
-    // Backward-compat alias (some pages use esc())
-    function esc($v) { return h($v); }
+    function esc($v) { return htmlspecialchars((string)$v, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 }
 
 /* --------------------------------
-   Redirect & flash
+   Redirect helpers (if not in bootstrap)
 ----------------------------------- */
 if (!function_exists('redirect')) {
     function redirect(string $url) {
@@ -44,29 +31,26 @@ if (!function_exists('redirect')) {
         exit;
     }
 }
-if (!function_exists('flash_set')) {
-    function flash_set(string $msg) { $_SESSION['flash'] = (string)$msg; }
-}
+
+// flash_get moved to bootstrap.php as flash_out()
 if (!function_exists('flash_get')) {
     function flash_get(): string {
-        if (!empty($_SESSION['flash'])) { $m = $_SESSION['flash']; unset($_SESSION['flash']); return (string)$m; }
+        if (!empty($_SESSION['flash'])) {
+            $m = $_SESSION['flash'];
+            unset($_SESSION['flash']);
+            return (string)(is_array($m) ? ($m['msg'] ?? '') : $m);
+        }
         return '';
     }
 }
 
 /* --------------------------------
-   CSRF
+   CSRF helpers (bootstrap.php provides csrf_field, csrf_verify)
 ----------------------------------- */
 if (!function_exists('csrf_token')) {
     function csrf_token(): string {
-        if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32));
-        return $_SESSION['csrf'];
-    }
-}
-if (!function_exists('csrf_verify')) {
-    function csrf_verify($token): bool {
-        if (!isset($_SESSION['csrf']) || !is_string($token)) return false;
-        return hash_equals($_SESSION['csrf'], (string)$token);
+        // Bootstrap already handles this, provide helper for compatibility
+        return $_SESSION['csrf'] ?? '';
     }
 }
 
@@ -81,23 +65,15 @@ if (!function_exists('is_strong_password')) {
 }
 
 /* --------------------------------
-   Logging (best-effort)
+   Logging (enhanced version moved to bootstrap.php)
 ----------------------------------- */
-if (!function_exists('app_log')) {
-    function app_log($msg) {
-        $line = '['.date('c').'] '.(is_scalar($msg)?$msg:json_encode($msg)).PHP_EOL;
-        @file_put_contents(dirname(__DIR__).'/logs/app.log', $line, FILE_APPEND | LOCK_EX);
-    }
-}
 
 /* --------------------------------
-   Session/user helpers
+   Session/user helpers (auth functions moved to bootstrap.php)
 ----------------------------------- */
-if (!function_exists('is_logged_in')) {
-    function is_logged_in(): bool { return !empty($_SESSION['user_id']); }
-}
-if (!function_exists('current_user')) {
-    function current_user(): ?array {
+// Helper function for current_user data retrieval (not the auth check)
+if (!function_exists('current_user_data')) {
+    function current_user_data(): ?array {
         if (empty($_SESSION['user_id'])) return null;
         $uid = (int)$_SESSION['user_id'];
 
@@ -135,36 +111,6 @@ if (!function_exists('current_user')) {
         $res = $stmt->get_result();
         $row = $res ? $res->fetch_assoc() : null;
         return $row ?: $fallback;
-    }
-}
-if (!function_exists('require_admin')) {
-    function require_admin(): void {
-        if (empty($_SESSION['user_id']) || (int)($_SESSION['is_admin'] ?? 0) !== 1) {
-            header('Location: /login.php');
-            exit;
-        }
-    }
-}
-if (!function_exists('require_login')) {
-    function require_login(): void {
-        if (!is_logged_in()) {
-            header('Location: /login.php');
-            exit;
-        }
-    }
-}
-if (!function_exists('require_active_user')) {
-    function require_active_user(): void {
-        if (!is_logged_in()) {
-            header('Location: /login.php');
-            exit;
-        }
-        $status = strtolower((string)($_SESSION['status'] ?? ''));
-        $emailVer = (int)($_SESSION['email_verified'] ?? 0);
-        if ($emailVer !== 1 || !in_array($status, ['active', 'approved'], true)) {
-            header('Location: /pending_approval.php');
-            exit;
-        }
     }
 }
 

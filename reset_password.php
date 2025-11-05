@@ -1,7 +1,7 @@
 <?php
 // reset_password.php — verify token & set new password (production-safe)
-require_once __DIR__ . '/config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+// Session and security handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 /* ---------- small helpers ---------- */
 function has_column(mysqli $db, string $table, string $col): bool {
@@ -22,10 +22,8 @@ $has_used_at    = has_column($mysqli, 'password_resets', 'used_at');
 $has_remember   = has_column($mysqli, 'users', 'remember_token');
 
 /* ---------- CSRF ---------- */
-if (empty($_SESSION['rp_csrf'])) {
-    $_SESSION['rp_csrf'] = bin2hex(random_bytes(16));
-}
-$csrf = $_SESSION['rp_csrf'];
+// Use unified CSRF system - get token from centralized implementation
+$csrf = get_csrf_token();
 
 /* ---------- initial state ---------- */
 $token  = trim((string)($_GET['token'] ?? ''));
@@ -92,7 +90,7 @@ if ($token !== '') {
 
 /* ---------- handle form submit ---------- */
 if ($valid && $_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!hash_equals($csrf, (string)($_POST['csrf'] ?? ''))) {
+    if (!validate_csrf($_POST['csrf'] ?? '')) {
         $err = 'Security check failed. Please reload and try again.';
     } else {
         $p1 = (string)($_POST['password'] ?? '');

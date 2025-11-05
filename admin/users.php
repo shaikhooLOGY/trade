@@ -4,8 +4,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/bootstrap.php';
 require_admin();
 
-if (empty($_SESSION['admin_csrf'])) $_SESSION['admin_csrf'] = bin2hex(random_bytes(16));
-$csrf = $_SESSION['admin_csrf'];
+$csrf = get_csrf_token();
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 

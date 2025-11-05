@@ -1,7 +1,7 @@
 <?php
 // TRADE_NEW_MINIMAL_VERSION.php - Simplified version for compatibility testing
-require_once __DIR__ . '/config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+// Session and security handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
 $uid = (int)$_SESSION['user_id'];

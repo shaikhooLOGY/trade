@@ -1,0 +1,198 @@
+<?php
+/**
+ * api/dashboard/m
+ * 
+ * Dedicated metrics endpoint for range-based dashboard data
+ * Handles URL patterns: /m:30-30, /m:35-35, /m:246-246
+ */
+
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+
+// Handle preflight requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+// Load environment configuration first
+require_once __DIR__ . '/../../includes/env.php';
+
+// Bootstrap the application
+require_once __DIR__ . '/../../includes/bootstrap.php';
+
+// Include security components
+require_once __DIR__ . '/../../includes/security/csrf.php';
+require_once __DIR__ . '/../../includes/security/ratelimit.php';
+require_once __DIR__ . '/../../includes/http/json.php';
+
+// Feature gating - check if APIs are enabled
+if (!getenv('APP_FEATURE_APIS') || getenv('APP_FEATURE_APIS') !== '1') {
+    json_fail('FEATURE_OFF', 'Feature disabled', []);
+}
+
+// Only allow GET requests
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    json_fail('METHOD_NOT_ALLOWED', 'Only GET method is allowed', []);
+}
+
+// Apply rate limiting (GET requests)
+rate_limit_api_middleware('dashboard_metrics_range', (int)getenv('RATE_LIMIT_GET', 120));
+
+try {
+    // Require authentication
+    $user = require_login_json();
+    $userId = (int)$user['id'];
+    
+    // Extract range from the URL path
+    $requestUri = $_SERVER['REQUEST_URI'] ?? '';
+    $pathInfo = parse_url($requestUri, PHP_URL_PATH);
+    $pathParts = explode('/', trim($pathInfo, '/'));
+    
+    // Find the 'm:' pattern in the path
+    $rangePattern = null;
+    foreach ($pathParts as $part) {
+        if (strpos($part, 'm:') === 0) {
+            $rangePattern = substr($part, 2); // Remove 'm:' prefix
+            break;
+        }
+    }
+    
+    if (!$rangePattern) {
+        json_fail('BAD_REQUEST', 'Invalid range format. Use m:XX-YY format', [
+            'expected' => 'm:30-30, m:35-35, m:246-246',
+            'received' => $pathParts
+        ], 400);
+    }
+    
+    // Parse the range (e.g., "30-30" -> $from=30, $to=30)
+    if (!preg_match('/^(\d+)-(\d+)$/', $rangePattern, $matches)) {
+        json_fail('BAD_REQUEST', 'Invalid range format. Use m:XX-YY format', [
+            'received' => $rangePattern,
+            'expected' => 'e.g., m:30-30, m:35-35'
+        ], 400);
+    }
+    
+    $from = (int)$matches[1];
+    $to = (int)$matches[2];
+    
+    // Validate range
+    if ($from < 0 || $to < 0) {
+        json_fail('BAD_REQUEST', 'Range values must be positive integers', [
+            'from' => $from,
+            'to' => $to
+        ], 400);
+    }
+    
+    if ($from > $to) {
+        json_fail('BAD_REQUEST', 'Range start must be less than or equal to end', [
+            'from' => $from,
+            'to' => $to
+        ], 400);
+    }
+    
+    // Check CSRF for API endpoints
+    csrf_api_middleware();
+    
+    global $mysqli;
+    
+    // Get metrics for the specified range
+    $metrics = [];
+    $totalCount = 0;
+    
+    try {
+        // 1. Get active MTM models in the range
+        $stmt = $mysqli->prepare("
+            SELECT 
+                id, 
+                code,
+                name, 
+                tiering,
+                is_active,
+                created_at,
+                updated_at
+            FROM mtm_models 
+            WHERE is_active = 1
+            ORDER BY created_at DESC
+            LIMIT ? OFFSET ?
+        ");
+        
+        if ($stmt) {
+            $stmt->bind_param('ii', $to, $from);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            
+            while ($row = $result->fetch_assoc()) {
+                $tiering = null;
+                try {
+                    $tiering = json_decode($row['tiering'], true);
+                } catch (Exception $e) {
+                    $tiering = null;
+                }
+                
+                $metrics[] = [
+                    'id' => (int)$row['id'],
+                    'code' => $row['code'],
+                    'name' => $row['name'],
+                    'tiering' => $tiering,
+                    'is_active' => (bool)$row['is_active'],
+                    'created_at' => $row['created_at'],
+                    'updated_at' => $row['updated_at']
+                ];
+            }
+            $stmt->close();
+        }
+        
+        // 2. Get count of total active models for pagination info
+        $countStmt = $mysqli->prepare("
+            SELECT COUNT(*) as total 
+            FROM mtm_models 
+            WHERE is_active = 1
+        ");
+        
+        if ($countStmt) {
+            $countStmt->execute();
+            $countResult = $countStmt->get_result();
+            $totalCount = (int)$countResult->fetch_assoc()['total'];
+            $countStmt->close();
+        }
+        
+    } catch (Exception $e) {
+        app_log('error', 'Dashboard metrics range query failed: ' . $e->getMessage());
+        json_fail('DATABASE_ERROR', 'Failed to retrieve metrics data', [
+            'range' => ['from' => $from, 'to' => $to]
+        ], 500);
+    }
+    
+    // Log dashboard range access
+    app_log('info', sprintf(
+        'Dashboard metrics range accessed - User: %d, Range: %d-%d, Results: %d, Total: %d',
+        $userId,
+        $from,
+        $to,
+        count($metrics),
+        $totalCount
+    ));
+    
+    // Return success response
+    json_ok([
+        'range' => ['from' => $from, 'to' => $to],
+        'metrics' => $metrics,
+        'pagination' => [
+            'offset' => $from,
+            'limit' => $to,
+            'returned' => count($metrics),
+            'total_available' => $totalCount
+        ],
+        'timestamp' => date('c'),
+        'user_id' => $userId
+    ], 'Metrics for range retrieved successfully');
+    
+} catch (Exception $e) {
+    app_log('error', 'Dashboard metrics API error: ' . $e->getMessage());
+    json_fail('SERVER_ERROR', 'Failed to process metrics request', [
+        'range_pattern' => $rangePattern ?? 'unknown'
+    ], 500);
+}

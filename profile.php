@@ -1,10 +1,7 @@
 <?php
 // Universal Profile Page - Works on any server configuration
-// Handles both local and live server directory structures
-
-// Enable error reporting for debugging
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+// Session and security handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 // Auto-detect correct base path
 $base_path = __DIR__;
@@ -25,7 +22,7 @@ foreach ($search_paths as $path) {
 }
 
 if (!$config_found) {
-    die('❌ Error: Could not find config.php in any directory. 
+    die('❌ Error: Could not find config.php in any directory.
          <br>Searched paths: ' . implode(', ', $search_paths) . '
          <br>Current dir: ' . __DIR__ . '
          <br>Parent dir: ' . dirname(__DIR__));
@@ -33,8 +30,6 @@ if (!$config_found) {
 
 // Load required files
 try {
-    require_once $base_path . '/config.php';
-    
     // Load guard.php with protection
     if (file_exists($base_path . '/guard.php')) {
         $_SERVER['SCRIPT_NAME'] = 'profile_universal.php'; // Mock for guard
@@ -47,13 +42,8 @@ try {
     }
     
 } catch (Exception $e) {
-    die('❌ Configuration Error: ' . $e->getMessage() . 
+    die('❌ Configuration Error: ' . $e->getMessage() .
         '<br>Base path: ' . $base_path);
-}
-
-// Start session safely
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
 }
 
 // Check login

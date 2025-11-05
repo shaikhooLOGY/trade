@@ -66,7 +66,7 @@ $stmt->close();
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && empty($_POST['task_id'])) {
     $action = $_POST['action'];
 
-    if (!hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) {
+    if (!validate_csrf($_POST['csrf'] ?? '')) {
         $_SESSION['flash'] = 'CSRF token invalid';
         header("Location: /admin/mtm_model_view.php?id={$model_id}");
         exit;
@@ -139,7 +139,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'], $_POST['tas
     $action = $_POST['action'];
     $task_id = (int)$_POST['task_id'];
 
-    if (!hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) {
+    if (!validate_csrf($_POST['csrf'] ?? '')) {
         $_SESSION['flash'] = 'CSRF token invalid';
         header("Location: /admin/mtm_model_view.php?id={$model_id}&tab=tasks");
         exit;
@@ -236,7 +236,7 @@ $stmt->close();
 
 // Flash message
 
-$csrfToken = $_SESSION['csrf'] ?? '';
+$csrfToken = get_csrf_token();
 $flash = $_SESSION['flash'] ?? '';
 unset($_SESSION['flash']);
 

@@ -1,14 +1,12 @@
 <?php
 // admin/mtm_tasks.php — MTM Tasks Manager (list + add + edit + delete + advanced JSON rules)
-require_once __DIR__ . '/../config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/../includes/bootstrap.php';
 if (empty($_SESSION['is_admin'])) { header('HTTP/1.1 403 Forbidden'); exit('Access denied'); }
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function t($s){ return trim((string)$s); }
 
-if (empty($_SESSION['admin_csrf'])) $_SESSION['admin_csrf'] = bin2hex(random_bytes(16));
-$csrf = $_SESSION['admin_csrf'];
+$csrf = get_csrf_token();
 
 // --- Input: model id ---
 $model_id = (int)($_GET['model_id'] ?? 0);
@@ -44,7 +42,7 @@ unset($_SESSION['flash']);
 $mode = $_GET['mode'] ?? '';            // 'edit' for editing existing task
 $edit_id = (int)($_GET['id'] ?? 0);     // current editing row
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['csrf']) && hash_equals($csrf, (string)$_POST['csrf'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && validate_csrf($_POST['csrf'] ?? '')) {
   $action = $_POST['action'] ?? '';
 
   // Common fields

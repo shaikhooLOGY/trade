@@ -1,18 +1,18 @@
 <?php
 // dashboard.php — v3.7 (UI-small: Outcome col, Exit Date col, trimmed numbers, no Qty, status Open/Closed only)
-require_once __DIR__ . '/config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/includes/bootstrap.php';
 if (empty($_SESSION['user_id'])) { header('Location: /login.php'); exit; }
 
 $user_id = (int)$_SESSION['user_id'];
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES|ENT_SUBSTITUTE, 'UTF-8'); }
 function t($s){ return trim((string)$s); }
-function csrf_token(){ if(empty($_SESSION['csrf'])) $_SESSION['csrf']=bin2hex(random_bytes(32)); return $_SESSION['csrf']; }
-function csrf_ok($x){ return isset($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], (string)$x); }
+function csrf_token(){ return get_csrf_token(); }
+function csrf_ok($x){ return validate_csrf((string)$x); }
 
-/** Safe column check (so we don’t break if a column doesn’t exist) */
+/** Safe column check (so we don't break if a column doesn't exist) */
 function has_column($mysqli,$table,$col){
+  $c = 0;
   $st=$mysqli->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?");
   $st->bind_param('ss',$table,$col); $st->execute(); $st->bind_result($c); $st->fetch(); $st->close();
   return ((int)$c>0);

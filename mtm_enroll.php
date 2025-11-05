@@ -1,13 +1,4 @@
 <?php
-// Ensure CSRF token exists in session
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-// Use unified CSRF helper
-require_once __DIR__ . '/includes/security/csrf_unify.php';
-$csrf = get_csrf_token();
-?>
-<?php
 /**
  * MTM Enrollment Page
  *
@@ -16,7 +7,6 @@ $csrf = get_csrf_token();
 
 // Include required files - bootstrap.php now handles all dependencies
 require_once __DIR__ . '/includes/bootstrap.php';
-require_once __DIR__ . '/includes/guard.php';
 
 // Include MTM modules
 require_once __DIR__ . '/includes/mtm/mtm_rules.php';
@@ -32,6 +22,9 @@ $availableModels = get_available_models($GLOBALS['mysqli']);
 
 // Flash messages
 flash_out();
+
+// Get CSRF token for form
+$csrf = get_csrf_token();
 ?>
 
 <style>

@@ -1,21 +1,15 @@
 <?php
 // verify_profile.php — Email OTP verification (no public nav; shows only a small Logout link)
 // FULL VERSION — copy-paste ready
-
-if (session_status() === PHP_SESSION_NONE) session_start();
-
-require_once __DIR__ . '/config.php';   // $mysqli
-require_once __DIR__ . '/mailer.php';   // sendMail($to,$subject,$html,$text='')
+// Session and security handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 // ---------- helpers ----------
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function only_digits($s){ return preg_replace('/\D+/', '', (string)$s); }
 
-// CSRF
-if (empty($_SESSION['vp_csrf'])) {
-    $_SESSION['vp_csrf'] = bin2hex(random_bytes(16));
-}
-$csrf = $_SESSION['vp_csrf'];
+// Use unified CSRF system - get token from centralized implementation
+$csrf = get_csrf_token();
 
 // Inputs
 $email  = isset($_GET['email']) ? trim((string)$_GET['email']) : '';
@@ -67,7 +61,7 @@ if (!$err_msgs && $user) {
 
     $resendRequested =
         ($action === 'resend') ||
-        (isset($_POST['resend']) && isset($_POST['csrf']) && hash_equals($csrf, (string)$_POST['csrf']));
+        (isset($_POST['resend']) && validate_csrf($_POST['csrf'] ?? ''));
 
     if ($resendRequested) {
         if ($now < (int)$_SESSION['vp_next_resend']) {
@@ -129,7 +123,7 @@ if (!$err_msgs && $user) {
 }
 
 // ---------- VERIFY ----------
-if (!$err_msgs && $user && isset($_POST['verify']) && isset($_POST['csrf']) && hash_equals($csrf, (string)$_POST['csrf'])) {
+if (!$err_msgs && $user && isset($_POST['verify']) && validate_csrf($_POST['csrf'] ?? '')) {
     $code = only_digits($_POST['otp'] ?? '');
     if ($code === '' || strlen($code) !== 6) {
         $err_msgs[] = "Please enter a 6-digit code. (6 huroof ka code daliyé.)";

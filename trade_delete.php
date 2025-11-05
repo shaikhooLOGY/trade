@@ -1,10 +1,9 @@
 <?php
-require_once __DIR__ . '/config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+// Trade delete confirmation handler
+// Session and security handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
-function csrf_token(){ if(empty($_SESSION['csrf'])) $_SESSION['csrf']=bin2hex(random_bytes(32)); return $_SESSION['csrf']; }
-function csrf_verify($t){ return isset($_SESSION['csrf']) && is_string($t) && hash_equals($_SESSION['csrf'],$t); }
 function require_login(){ if(empty($_SESSION['user_id'])){ header('Location: /login.php'); exit; } }
 function flash_set($m){ $_SESSION['flash']=$m; }
 function flash_pop(){ $m=$_SESSION['flash']??''; if($m!=='') unset($_SESSION['flash']); return $m; }
@@ -18,7 +17,7 @@ if($tradeId<=0){ flash_set('Invalid trade id.'); header('Location: /dashboard.ph
 
 // handle delete on POST
 if($_SERVER['REQUEST_METHOD']==='POST'){
-  if(!csrf_verify($_POST['csrf']??'')){
+  if(!validate_csrf($_POST['csrf']??'')){
     flash_set('Security token invalid. Try again.');
     header('Location: /dashboard.php'); exit;
   }
@@ -74,7 +73,7 @@ include __DIR__.'/header.php'; $msg=flash_pop();
     </div>
     <form method="post" onsubmit="return confirm('Pakka delete karna hai?');">
       <input type="hidden" name="id" value="<?=h($trade['id'])?>">
-      <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+      <input type="hidden" name="csrf" value="<?=h(get_csrf_token())?>">
       <button type="submit" style="background:#ef4444;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:800;cursor:pointer">🗑 Delete Trade</button>
       <a href="/dashboard.php" style="margin-left:8px;background:#f1f5f9;border-radius:10px;padding:10px 14px;text-decoration:none;font-weight:700;color:#111">Cancel</a>
     </form>

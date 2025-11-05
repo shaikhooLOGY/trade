@@ -2,11 +2,7 @@
 // mtm.php
 // User MTM programs listing and enrollment discovery
 
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/includes/env.php';
-// In non-prod, enforce expected DB to avoid accidental prod hits
-db_assert_database($mysqli, $DB_NAME, APP_ENV !== 'prod');
-
+// Single include for all dependencies - bootstrap.php now handles everything
 require_once __DIR__ . '/includes/bootstrap.php';
 require_login();
 

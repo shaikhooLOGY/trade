@@ -37,7 +37,7 @@ if ($is_edit) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!hash_equals($_SESSION['csrf'] ?? '', $_POST['csrf'] ?? '')) {
+    if (!validate_csrf($_POST['csrf'] ?? '')) {
         $_SESSION['flash'] = 'CSRF token invalid';
         header("Location: /admin/mtm_model_edit.php" . ($is_edit ? "?id={$model_id}" : ""));
         exit;

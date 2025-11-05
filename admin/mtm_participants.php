@@ -30,7 +30,7 @@ if (!$model) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
 
-    if (!isset($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], $_POST['csrf'] ?? '')) {
+    if (!validate_csrf($_POST['csrf'] ?? '')) {
         $_SESSION['flash'] = 'CSRF token invalid';
         header("Location: /admin/mtm_participants.php?model_id={$model_id}");
         exit;

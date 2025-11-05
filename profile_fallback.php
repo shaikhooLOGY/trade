@@ -37,11 +37,6 @@ try {
     die('Configuration error: ' . $e->getMessage());
 }
 
-// Start session safely
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
 // Check login status
 if (empty($_SESSION['user_id'])) {
     header('Location: login.php');

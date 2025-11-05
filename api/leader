@@ -1,0 +1,409 @@
+<?php
+/**
+ * api/leaderboard/top.php
+ * 
+ * Leaderboard API - Get top performers
+ * GET /api/leaderboard/top.php?period=weekly|monthly|all&page=1&limit=20
+ */
+
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+
+// Handle preflight requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
+
+// Bootstrap the application
+require_once __DIR__ . '/../../includes/bootstrap.php';
+
+// Include security components
+require_once __DIR__ . '/../../includes/security/csrf.php';
+require_once __DIR__ . '/../../includes/security/ratelimit.php';
+require_once __DIR__ . '/../../includes/http/json.php';
+
+// Feature gating - check if APIs are enabled
+if (!getenv('APP_FEATURE_APIS') || getenv('APP_FEATURE_APIS') !== '1') {
+    json_fail('FEATURE_OFF', 'Feature disabled');
+}
+
+// Only allow GET requests
+if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+    json_fail('METHOD_NOT_ALLOWED', 'Only GET method is allowed');
+}
+
+// Apply rate limiting (GET requests)
+rate_limit_api_middleware('leaderboard_top', (int)getenv('RATE_LIMIT_GET', 120));
+
+try {
+    // Optional authentication - leaderboard is public but authenticated users get more details
+    $currentUser = null;
+    $userId = 0;
+    $isAdmin = false;
+    
+    if (!empty($_SESSION['user_id'])) {
+        $user = require_login_json();
+        $currentUser = $user;
+        $userId = (int)$user['id'];
+        $isAdmin = isset($user['role']) && $user['role'] === 'admin';
+    }
+    
+    // Check CSRF for API endpoints
+    csrf_api_middleware();
+    
+    // Get query parameters
+    $period = $_GET['period'] ?? 'weekly';
+    $page = max(1, (int)($_GET['page'] ?? 1));
+    $limit = min(100, max(1, (int)($_GET['limit'] ?? 20))); // Max 100 per page
+    
+    // Validate period
+    $validPeriods = ['weekly', 'monthly', 'all'];
+    if (!in_array($period, $validPeriods, true)) {
+        json_fail('VALIDATION_ERROR', 'Invalid period. Must be: ' . implode(', ', $validPeriods));
+    }
+    
+    global $mysqli;
+    
+    // Build date filter based on period
+    $dateCondition = '';
+    switch ($period) {
+        case 'weekly':
+            $dateCondition = 'AND t.opened_at >= DATE_SUB(NOW(), INTERVAL 1 WEEK)';
+            break;
+        case 'monthly':
+            $dateCondition = 'AND t.opened_at >= DATE_SUB(NOW(), INTERVAL 1 MONTH)';
+            break;
+        case 'all':
+            $dateCondition = '';
+            break;
+    }
+    
+    // Check column names in trades table
+    $traderColumn = 'trader_id';
+    $userCheck = $mysqli->query("SHOW COLUMNS FROM trades LIKE 'user_id'");
+    if ($userCheck->num_rows > 0) {
+        $traderColumn = 'user_id';
+    }
+    $userCheck->close();
+    
+    // Check if deleted_at column exists
+    $deletedCheck = $mysqli->query("SHOW COLUMNS FROM trades LIKE 'deleted_at'");
+    $hasDeletedAt = $deletedCheck->num_rows > 0;
+    $deletedCheck->close();
+    
+    $deletedCondition = $hasDeletedAt ? 'AND t.deleted_at IS NULL' : '';
+    
+    // Get total count for pagination
+    $countQuery = "
+        SELECT COUNT(DISTINCT u.id) as total_users
+        FROM users u
+        INNER JOIN trades t ON t.{$traderColumn} = u.id
+        WHERE u.status IN ('active', 'approved')
+        AND u.email_verified = 1
+        $dateCondition
+        $deletedCondition
+        AND t.symbol IS NOT NULL
+        AND t.quantity IS NOT NULL
+        AND t.price IS NOT NULL
+    ";
+    
+    $countStmt = $mysqli->prepare($countQuery);
+    if (!$countStmt) {
+        throw new Exception('Failed to prepare count query');
+    }
+    
+    $countStmt->execute();
+    $countResult = $countStmt->get_result();
+    $totalUsers = (int)$countResult->fetch_assoc()['total_users'];
+    $countStmt->close();
+    
+    // Get top performers
+    $offset = ($page - 1) * $limit;
+    
+    $query = "
+        SELECT 
+            u.id,
+            u.name,
+            COALESCE(u.display_name, u.name) as display_name,
+            COUNT(t.id) as total_trades,
+            COUNT(CASE WHEN t.outcome = 'win' THEN 1 END) as winning_trades,
+            COUNT(CASE WHEN t.outcome = 'loss' THEN 1 END) as losing_trades,
+            ROUND(
+                CASE 
+                    WHEN COUNT(t.id) > 0 THEN 
+                        (COUNT(CASE WHEN t.outcome = 'win' THEN 1 END) * 100.0 / COUNT(t.id))
+                    ELSE 0 
+                END, 2
+            ) as win_rate,
+            ROUND(
+                SUM(CASE 
+                    WHEN t.side = 'buy' THEN t.quantity * (COALESCE(t.close_price, t.price) - t.price)
+                    ELSE t.quantity * (t.price - COALESCE(t.close_price, t.price))
+                END), 2
+            ) as total_pnl,
+            ROUND(
+                AVG(CASE 
+                    WHEN t.side = 'buy' THEN 
+                        CASE WHEN COALESCE(t.close_price, t.price) > t.price 
+                             THEN ((COALESCE(t.close_price, t.price) - t.price) / t.price * 100)
+                             ELSE 0 END
+                    ELSE 
+                        CASE WHEN t.price > COALESCE(t.close_price, t.price) 
+                             THEN ((t.price - COALESCE(t.close_price, t.price)) / t.price * 100)
+                             ELSE 0 END
+                END), 2
+            ) as avg_return_pct,
+            MAX(t.opened_at) as last_trade_date,
+            MIN(t.opened_at) as first_trade_date,
+            CASE WHEN u.id = ? THEN 1 ELSE 0 END as is_current_user
+        FROM users u
+        INNER JOIN trades t ON t.{$traderColumn} = u.id
+        WHERE u.status IN ('active', 'approved')
+        AND u.email_verified = 1
+        $dateCondition
+        $deletedCondition
+        AND t.symbol IS NOT NULL
+        AND t.quantity IS NOT NULL
+        AND t.price IS NOT NULL
+        GROUP BY u.id, u.name, u.display_name
+        HAVING total_trades > 0
+        ORDER BY 
+            total_pnl DESC,
+            win_rate DESC,
+            total_trades DESC
+        LIMIT ? OFFSET ?
+    ";
+    
+    $stmt = $mysqli->prepare($query);
+    if (!$stmt) {
+        throw new Exception('Failed to prepare leaderboard query');
+    }
+    
+    $stmt->bind_param('iii', $userId, $limit, $offset);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $leaders = [];
+    $rank = $offset + 1;
+    
+    while ($row = $result->fetch_assoc()) {
+        // Determine rank based on sorting criteria
+        $currentRank = $rank++;
+        
+        // Build leader entry
+        $leader = [
+            'rank' => $currentRank,
+            'user_id' => (int)$row['id'],
+            'name' => $row['display_name'],
+            'total_trades' => (int)$row['total_trades'],
+            'winning_trades' => (int)$row['winning_trades'],
+            'losing_trades' => (int)$row['losing_trades'],
+            'win_rate' => (float)$row['win_rate'],
+            'total_pnl' => (float)$row['total_pnl'],
+            'avg_return_pct' => (float)$row['avg_return_pct'],
+            'is_current_user' => (bool)$row['is_current_user'],
+            'last_trade_date' => $row['last_trade_date'],
+            'first_trade_date' => $row['first_trade_date']
+        ];
+        
+        // Add additional details if user is viewing their own entry or is admin
+        if ($currentUser && ($row['is_current_user'] || $isAdmin)) {
+            // Get recent performance (last 10 trades)
+            $recentQuery = "
+                SELECT symbol, side, quantity, price, outcome, opened_at, close_price
+                FROM trades t
+                WHERE t.{$traderColumn} = ?
+                $dateCondition
+                $deletedCondition
+                ORDER BY t.opened_at DESC
+                LIMIT 10
+            ";
+            
+            $recentStmt = $mysqli->prepare($recentQuery);
+            if ($recentStmt) {
+                $recentStmt->bind_param('i', $row['id']);
+                $recentStmt->execute();
+                $recentResult = $recentStmt->get_result();
+                
+                $recentTrades = [];
+                while ($trade = $recentResult->fetch_assoc()) {
+                    $pnl = null;
+                    if ($trade['close_price'] !== null) {
+                        if ($trade['side'] === 'buy') {
+                            $pnl = ($trade['close_price'] - $trade['price']) * $trade['quantity'];
+                        } else {
+                            $pnl = ($trade['price'] - $trade['close_price']) * $trade['quantity'];
+                        }
+                    }
+                    
+                    $recentTrades[] = [
+                        'symbol' => $trade['symbol'],
+                        'side' => $trade['side'],
+                        'quantity' => (float)$trade['quantity'],
+                        'price' => (float)$trade['price'],
+                        'outcome' => $trade['outcome'],
+                        'pnl' => $pnl !== null ? round($pnl, 2) : null,
+                        'opened_at' => $trade['opened_at']
+                    ];
+                }
+                
+                $leader['recent_trades'] = $recentTrades;
+                $recentStmt->close();
+            }
+        }
+        
+        // Add trend data for admin or own profile
+        if ($isAdmin || ($currentUser && $row['is_current_user'])) {
+            // Calculate monthly performance
+            $monthlyQuery = "
+                SELECT 
+                    DATE_FORMAT(t.opened_at, '%Y-%m') as month,
+                    COUNT(t.id) as trades_count,
+                    ROUND(
+                        SUM(CASE 
+                            WHEN t.side = 'buy' THEN t.quantity * (COALESCE(t.close_price, t.price) - t.price)
+                            ELSE t.quantity * (t.price - COALESCE(t.close_price, t.price))
+                        END), 2
+                    ) as monthly_pnl,
+                    ROUND(
+                        CASE 
+                            WHEN COUNT(t.id) > 0 THEN 
+                                (COUNT(CASE WHEN t.outcome = 'win' THEN 1 END) * 100.0 / COUNT(t.id))
+                            ELSE 0 
+                        END, 2
+                    ) as monthly_win_rate
+                FROM trades t
+                WHERE t.{$traderColumn} = ?
+                $deletedCondition
+                GROUP BY DATE_FORMAT(t.opened_at, '%Y-%m')
+                ORDER BY month DESC
+                LIMIT 6
+            ";
+            
+            $monthlyStmt = $mysqli->prepare($monthlyQuery);
+            if ($monthlyStmt) {
+                $monthlyStmt->bind_param('i', $row['id']);
+                $monthlyStmt->execute();
+                $monthlyResult = $monthlyStmt->get_result();
+                
+                $monthlyPerformance = [];
+                while ($monthData = $monthlyResult->fetch_assoc()) {
+                    $monthlyPerformance[] = [
+                        'month' => $monthData['month'],
+                        'trades_count' => (int)$monthData['trades_count'],
+                        'monthly_pnl' => (float)$monthData['monthly_pnl'],
+                        'monthly_win_rate' => (float)$monthData['monthly_win_rate']
+                    ];
+                }
+                
+                $leader['monthly_performance'] = $monthlyPerformance;
+                $monthlyStmt->close();
+            }
+        }
+        
+        $leaders[] = $leader;
+    }
+    $stmt->close();
+    
+    // Calculate pagination info
+    $totalPages = ceil($totalUsers / $limit);
+    
+    // Log leaderboard access
+    app_log('info', sprintf(
+        'Leaderboard accessed - Period: %s, Page: %d, Total Users: %d',
+        $period,
+        $page,
+        $totalUsers
+    ));
+    
+    // Return success response with pagination
+    $response = [
+        'leaders' => $leaders,
+        'period' => $period,
+        'pagination' => [
+            'current_page' => $page,
+            'per_page' => $limit,
+            'total_items' => $totalUsers,
+            'total_pages' => $totalPages,
+            'has_next' => $page < $totalPages,
+            'has_previous' => $page > 1
+        ]
+    ];
+    
+    // Add user's current rank if logged in and not in top results
+    if ($currentUser) {
+        // Find user's current rank
+        $userRankQuery = "
+            SELECT 
+                COUNT(DISTINCT u2.id) + 1 as user_rank
+            FROM users u2
+            INNER JOIN trades t2 ON t2.{$traderColumn} = u2.id
+            WHERE u2.status IN ('active', 'approved')
+            AND u2.email_verified = 1
+            $dateCondition
+            $deletedCondition
+            AND t2.symbol IS NOT NULL
+            AND t2.quantity IS NOT NULL
+            AND t2.price IS NOT NULL
+            AND (
+                (
+                    SUM(CASE 
+                        WHEN t2.side = 'buy' THEN t2.quantity * (COALESCE(t2.close_price, t2.price) - t2.price)
+                        ELSE t2.quantity * (t2.price - COALESCE(t2.close_price, t2.price))
+                    END) > (
+                        SELECT SUM(CASE 
+                            WHEN t3.side = 'buy' THEN t3.quantity * (COALESCE(t3.close_price, t3.price) - t3.price)
+                            ELSE t3.quantity * (t3.price - COALESCE(t3.close_price, t3.price))
+                        END)
+                        FROM trades t3
+                        WHERE t3.{$traderColumn} = ?
+                    )
+                )
+                OR
+                (
+                    ROUND(
+                        CASE 
+                            WHEN COUNT(t2.id) > 0 THEN 
+                                (COUNT(CASE WHEN t2.outcome = 'win' THEN 1 END) * 100.0 / COUNT(t2.id))
+                            ELSE 0 
+                        END, 2
+                    ) > (
+                        SELECT 
+                        ROUND(
+                            CASE 
+                                WHEN COUNT(t4.id) > 0 THEN 
+                                    (COUNT(CASE WHEN t4.outcome = 'win' THEN 1 END) * 100.0 / COUNT(t4.id))
+                                ELSE 0 
+                            END, 2
+                        )
+                        FROM trades t4
+                        WHERE t4.{$traderColumn} = ?
+                    )
+                )
+            )
+            AND u2.id != ?
+        ";
+        
+        $userRankStmt = $mysqli->prepare($userRankQuery);
+        if ($userRankStmt) {
+            $userRankStmt->bind_param('iii', $userId, $userId, $userId);
+            $userRankStmt->execute();
+            $userRankResult = $userRankStmt->get_result();
+            $userRank = (int)$userRankResult->fetch_assoc()['user_rank'];
+            $userRankStmt->close();
+            
+            if ($userRank > 0 && $userRank !== $currentRank) {
+                $response['user_current_rank'] = $userRank;
+            }
+        }
+    }
+    
+    json_ok($response);
+    
+} catch (Exception $e) {
+    app_log('error', 'Leaderboard top error: ' . $e->getMessage());
+    json_fail('SERVER_ERROR', 'Failed to retrieve leaderboard data');
+}

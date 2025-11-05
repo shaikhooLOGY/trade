@@ -2,10 +2,8 @@
 // includes/functions.php
 // Common helpers for Shaikhoology (idempotent, safe to re-include)
 
-if (session_status() === PHP_SESSION_NONE) {
-    // bootstrap normally starts session; this is defensive
-    session_start();
-}
+// Session managed by bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 /* --------------------------------
    DB handle (prefers $GLOBALS['mysqli'])

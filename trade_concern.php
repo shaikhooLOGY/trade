@@ -1,7 +1,6 @@
 <?php
 // /public_html/trade_concern.php
-require_once __DIR__ . '/config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/includes/bootstrap.php';
 
 if (empty($_SESSION['user_id'])) { header('Location: /login.php'); exit; }
 $uid = (int)$_SESSION['user_id'];
@@ -57,11 +56,8 @@ function ensure_table(mysqli $db) {
 }
 ensure_table($mysqli);
 
-// ---------- CSRF ----------
-if (empty($_SESSION['csrf_tc'])) {
-  $_SESSION['csrf_tc'] = bin2hex(random_bytes(16));
-}
-$csrf = $_SESSION['csrf_tc'];
+// ---------- CSRF (using unified system) ----------
+$csrf = get_csrf_token();
 
 // ---------- load trade ----------
 $trade_id = isset($_REQUEST['trade_id']) ? (int)$_REQUEST['trade_id'] : 0;
@@ -78,7 +74,7 @@ $err = '';
 
 // ---------- submit ----------
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['__submit_tc'])) {
-  if (!hash_equals($csrf, $_POST['csrf'] ?? '')) {
+  if (!validate_csrf($_POST['csrf'] ?? '')) {
     $err = "Invalid request (CSRF).";
   } else {
     $reason  = trim($_POST['reason'] ?? '');
@@ -118,7 +114,7 @@ textarea{min-height:120px}
   <?php if ($err): ?><div class="alert alert-err"><?= h($err) ?></div><?php endif; ?>
 
   <form method="post" class="card" autocomplete="off">
-    <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+    <input type="hidden" name="csrf" value="<?= h(get_csrf_token()) ?>">
     <input type="hidden" name="trade_id" value="<?= (int)$trade_id ?>">
     <input type="hidden" name="__submit_tc" value="1">
 

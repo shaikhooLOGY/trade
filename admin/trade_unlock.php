@@ -1,7 +1,6 @@
 <?php
 // admin/admin_unlocks.php — Manage trade unlock approvals (no expiry version)
-require_once __DIR__ . '/../config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/../includes/bootstrap.php';
 
 if (empty($_SESSION['is_admin'])) {
   header('HTTP/1.1 403 Forbidden');
@@ -12,8 +11,6 @@ if (empty($_SESSION['is_admin'])) {
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 function flash_set($m){ $_SESSION['flash'] = (string)$m; }
 function flash_pop(){ $m = $_SESSION['flash'] ?? ''; if ($m!=='') unset($_SESSION['flash']); return $m; }
-function csrf_token(){ if (empty($_SESSION['csrf'])) $_SESSION['csrf'] = bin2hex(random_bytes(32)); return $_SESSION['csrf']; }
-function csrf_verify($t){ return isset($_SESSION['csrf']) && is_string($t) && hash_equals($_SESSION['csrf'], $t); }
 
 // (optional) ensure column exists (runs fast; safe)
 // Comment this block if not needed.
@@ -27,7 +24,7 @@ if (!$colExists) {
 
 // handle actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  if (!csrf_verify($_POST['csrf'] ?? '')) {
+  if (!validate_csrf($_POST['csrf'] ?? '')) {
     flash_set('Security token invalid. Try again.');
     header('Location: admin_unlocks.php'); exit;
   }
@@ -157,17 +154,17 @@ $flash = flash_pop();
             </td>
             <td style="padding:10px;white-space:nowrap">
               <form method="post" style="display:inline">
-                <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+                <input type="hidden" name="csrf" value="<?= h(get_csrf_token()) ?>">
                 <input type="hidden" name="trade_id" value="<?= (int)$r['id'] ?>">
                 <button name="action" value="approve" style="background:#10b981;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Approve</button>
               </form>
               <form method="post" style="display:inline;margin-left:6px">
-                <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+                <input type="hidden" name="csrf" value="<?= h(get_csrf_token()) ?>">
                 <input type="hidden" name="trade_id" value="<?= (int)$r['id'] ?>">
                 <button name="action" value="reject" style="background:#ef4444;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Reject</button>
               </form>
               <form method="post" style="display:inline;margin-left:6px">
-                <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+                <input type="hidden" name="csrf" value="<?= h(get_csrf_token()) ?>">
                 <input type="hidden" name="trade_id" value="<?= (int)$r['id'] ?>">
                 <button name="action" value="reset" style="background:#f1f5f9;color:#111;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Reset</button>
               </form>

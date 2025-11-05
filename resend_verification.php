@@ -1,7 +1,7 @@
 <?php
 // competition/resend_verification.php
-if (session_status() === PHP_SESSION_NONE) session_start();
-require_once __DIR__ . '/config.php';
+// Session and security handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 // helper
 if (!function_exists('h')) {

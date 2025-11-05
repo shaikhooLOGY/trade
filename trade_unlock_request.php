@@ -1,15 +1,14 @@
 <?php
 // trade_unlock_request.php — Simple version without complex table dependencies
-require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/bootstrap.php';
 
-if (session_status() === PHP_SESSION_NONE) session_start();
 if (empty($_SESSION['user_id'])) { header('Location: /login.php'); exit; }
 
 $user_id = (int)$_SESSION['user_id'];
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 function t($s){ return trim((string)$s); }
-function csrf_token(){ if (empty($_SESSION['csrf'])) $_SESSION['csrf']=bin2hex(random_bytes(32)); return $_SESSION['csrf']; }
-function csrf_ok($x){ return isset($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], (string)$x); }
+function csrf_token(){ return get_csrf_token(); }
+function csrf_ok($x){ return validate_csrf((string)$x); }
 
 function log_error($msg) {
     error_log("UnlockRequest: " . $msg);

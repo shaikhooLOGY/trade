@@ -1,20 +1,18 @@
 <?php
 // admin/trade_center.php — v4.5 (stable) — synced with dashboard v3.6.3
-require_once __DIR__ . '/../config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/../includes/bootstrap.php';
+
 if (empty($_SESSION['is_admin'])) { header('HTTP/1.1 403 Forbidden'); exit('Admins only'); }
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 function t($s){ return trim((string)$s); }
-function csrf_token(){ if (empty($_SESSION['csrf'])) $_SESSION['csrf']=bin2hex(random_bytes(32)); return $_SESSION['csrf']; }
-function csrf_ok($x){ return isset($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], (string)$x); }
 function flash($m=null){ if($m!==null){ $_SESSION['flash']=$m; } else { $m=$_SESSION['flash']??''; unset($_SESSION['flash']); return $m; } }
 
 $VERSION='v4.5';
 if (!empty($_GET['flush']) && function_exists('opcache_reset')) @opcache_reset();
 
 /* ---------------- POST actions ---------------- */
-if ($_SERVER['REQUEST_METHOD']==='POST' && csrf_ok($_POST['csrf'] ?? '')) {
+if ($_SERVER['REQUEST_METHOD']==='POST' && validate_csrf($_POST['csrf'] ?? '')) {
   $act   = $_POST['action'] ?? '';
   $cid   = (int)($_POST['id'] ?? 0);
   $tid   = (int)($_POST['trade_id'] ?? 0);
@@ -230,19 +228,19 @@ include __DIR__ . '/../header.php';
                 <span style="background:#ecfdf5;color:#065f46;padding:6px 10px;border-radius:6px;font-weight:700">✅ Resolved</span>
               <?php else: ?>
                 <form method="post" style="display:inline">
-                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="csrf" value="<?=h(get_csrf_token())?>">
                   <input type="hidden" name="id" value="<?=$c['id']?>">
                   <input type="hidden" name="redir" value="trade_center.php?tab=concerns&status=<?=$v?>">
                   <button name="action" value="approve_concern" style="background:#10b981;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Approve</button>
                 </form>
                 <form method="post" style="display:inline;margin-left:6px">
-                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="csrf" value="<?=h(get_csrf_token())?>">
                   <input type="hidden" name="id" value="<?=$c['id']?>">
                   <input type="hidden" name="redir" value="trade_center.php?tab=concerns&status=<?=$v?>">
                   <button name="action" value="reject_concern" style="background:#ef4444;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Reject</button>
                 </form>
                 <form method="post" style="display:inline;margin-left:6px">
-                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="csrf" value="<?=h(get_csrf_token())?>">
                   <input type="hidden" name="id" value="<?=$c['id']?>">
                   <input type="hidden" name="redir" value="trade_center.php?tab=concerns&status=<?=$v?>">
                   <button name="action" value="resolve_concern" style="background:#f1f5f9;color:#111;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Resolve</button>
@@ -315,21 +313,21 @@ include __DIR__ . '/../header.php';
                 <?php if ($closed): ?>
                   <?php if ($unlock!=='approved'): ?>
                     <form method="post" style="display:inline">
-                      <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                      <input type="hidden" name="csrf" value="<?=h(get_csrf_token())?>">
                       <input type="hidden" name="trade_id" value="<?=$t['id']?>">
                       <input type="hidden" name="redir" value="trade_center.php?tab=user_trades&user_id=<?=$uid?>&status=<?=$state?>">
                       <button name="action" value="force_unlock" style="background:#5a2bd9;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Unlock</button>
                     </form>
                   <?php endif; ?>
                   <form method="post" style="display:inline;margin-left:6px">
-                    <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                    <input type="hidden" name="csrf" value="<?=h(get_csrf_token())?>">
                     <input type="hidden" name="trade_id" value="<?=$t['id']?>">
                     <input type="hidden" name="redir" value="trade_center.php?tab=user_trades&user_id=<?=$uid?>&status=<?=$state?>">
                     <button name="action" value="force_lock" style="background:#ef4444;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Lock</button>
                   </form>
                 <?php endif; ?>
                 <form method="post" style="display:inline;margin-left:6px">
-                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="csrf" value="<?=h(get_csrf_token())?>">
                   <input type="hidden" name="trade_id" value="<?=$t['id']?>">
                   <input type="hidden" name="redir" value="trade_center.php?tab=user_trades&user_id=<?=$uid?>&status=<?=$state?>">
                   <input type="text" name="reason" placeholder="Reason" style="padding:6px;border:1px solid #e5e7eb;border-radius:8px;max-width:160px">
@@ -337,7 +335,7 @@ include __DIR__ . '/../header.php';
                 </form>
               <?php else: ?>
                 <form method="post" style="display:inline">
-                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="csrf" value="<?=h(get_csrf_token())?>">
                   <input type="hidden" name="trade_id" value="<?=$t['id']?>">
                   <input type="hidden" name="redir" value="trade_center.php?tab=user_trades&user_id=<?=$uid?>&status=<?=$state?>">
                   <button name="action" value="restore" style="background:#10b981;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Restore</button>
@@ -378,7 +376,7 @@ include __DIR__ . '/../header.php';
             <td style="padding:10px"><?=h($d['deleted_reason'] ?? '')?></td>
             <td style="padding:10px">
               <form method="post" style="display:inline">
-                <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                <input type="hidden" name="csrf" value="<?=h(get_csrf_token())?>">
                 <input type="hidden" name="trade_id" value="<?=$d['id']?>">
                 <input type="hidden" name="redir" value="trade_center.php?tab=deleted">
                 <button name="action" value="restore" style="background:#10b981;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Restore</button>

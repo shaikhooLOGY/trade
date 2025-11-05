@@ -5,8 +5,8 @@
 //  - Otherwise, guide user to the OTP page / login
 //  - After a successful legacy verify, keep status 'pending' and send to pending_approval.php
 
-if (session_status() === PHP_SESSION_NONE) session_start();
-require_once __DIR__ . '/config.php';
+// Session and security handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 

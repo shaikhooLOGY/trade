@@ -1,15 +1,11 @@
 <?php
 // forgot_password.php  — copy-paste ready (refresh-persistent UI)
+// Session and security handling centralized via bootstrap.php
 // -------------------------------------------------
-require_once __DIR__ . '/config.php';
-require_once __DIR__ . '/mailer.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/includes/bootstrap.php';
 
-// --------- CSRF ----------
-if (empty($_SESSION['fp_csrf'])) {
-    $_SESSION['fp_csrf'] = bin2hex(random_bytes(16));
-}
-$csrf = $_SESSION['fp_csrf'];
+// Use unified CSRF system - get token from centralized implementation
+$csrf = get_csrf_token();
 
 // --------- Cooldown (10 minutes) ----------
 if (!isset($_SESSION['fp_next_ok_at'])) $_SESSION['fp_next_ok_at'] = 0;
@@ -25,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $token_csrf = $_POST['csrf'] ?? '';
 
-    if (!hash_equals($csrf, $token_csrf)) {
+    if (!validate_csrf($token_csrf)) {
         $err = 'Invalid request. Please reload and try again. (Galat request, page reload karke dubara koshish karein)';
     } elseif (time() < (int)$_SESSION['fp_next_ok_at']) {
         $remain = (int)$_SESSION['fp_next_ok_at'] - time();

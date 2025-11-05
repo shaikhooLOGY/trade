@@ -1,11 +1,7 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-if (file_exists(__DIR__ . '/includes/env.php')) {
-    require_once __DIR__ . '/includes/env.php';
-}
+// Config file - DB connection and environment setup
+// Session management and auth functions are now in bootstrap.php
+// This file should be included via bootstrap.php
 
 // -------- Error reporting by env --------
 $appEnv = getenv('APP_ENV') ?: 'local';
@@ -44,29 +40,9 @@ if (function_exists('db_assert_database')) {
     db_assert_database($mysqli, $dbName, $appEnv === 'prod');
 }
 
-// -------- Small helpers (guarded) --------
-if (!function_exists('is_logged_in')) {
-    function is_logged_in(): bool { return !empty($_SESSION['user_id']); }
-}
+// -------- Database helpers --------
 if (!function_exists('current_user_id')) {
-    function current_user_id(): ?int { return isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null; }
-}
-if (!function_exists('require_login')) {
-    function require_login(): void {
-        if (empty($_SESSION['user_id'])) { header('Location: /login.php'); exit; }
-    }
-}
-if (!function_exists('require_active_user')) {
-    function require_active_user(): void {
-        $status = strtolower((string)($_SESSION['status'] ?? ''));
-        $emailVerified = (int)($_SESSION['email_verified'] ?? 0);
-        if (!is_logged_in() || $emailVerified !== 1 || !in_array($status, ['active','approved'], true)) {
-            header('Location: /pending_approval.php'); exit;
-        }
-    }
-}
-if (!function_exists('require_admin')) {
-    function require_admin(): void {
-        if (empty($_SESSION['is_admin'])) { http_response_code(403); exit('Forbidden'); }
+    function current_user_id(): ?int {
+        return isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
     }
 }

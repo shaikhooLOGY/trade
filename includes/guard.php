@@ -1,11 +1,7 @@
 <?php
 // includes/guard.php
-// Auth + access checks. Bootstrap loads this file.
-
-// Make sure session exists (defensive; bootstrap already starts)
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// Auth + access checks. Auth functions moved to bootstrap.php.
+// This file now only contains page-specific public/private logic.
 
 /**
  * Public pages jahan guard redirect nahi karega.
@@ -30,44 +26,30 @@ if (!function_exists('guard_is_public')) {
 }
 
 /**
- * Must be logged in, else redirect to login.
+ * Enhanced require_login with public page check.
+ * Uses bootstrap.php version but with public page exemption.
  */
-if (!function_exists('require_login')) {
-    function require_login(): void {
+if (!function_exists('require_login_guarded')) {
+    function require_login_guarded(): void {
         if (guard_is_public()) return; // public pages: no-op
-        if (empty($_SESSION['user_id'])) {
-            header('Location: /login.php');
-            exit;
-        }
+        require_login(); // Use bootstrap.php version
     }
 }
 
 /**
- * Must be verified + approved (non-admin). Admins bypass by default.
+ * Enhanced require_active_user with public page check and admins bypass.
+ * Uses bootstrap.php version but with public page exemption.
  */
-if (!function_exists('require_active_user')) {
-    function require_active_user(bool $adminsBypass = true): void {
+if (!function_exists('require_active_user_guarded')) {
+    function require_active_user_guarded(bool $adminsBypass = true): void {
         if (guard_is_public()) return; // public pages: no-op
 
-        $is_admin       = (int)($_SESSION['is_admin'] ?? 0);
-        $email_verified = (int)($_SESSION['email_verified'] ?? 0);
-        $status         = strtolower((string)($_SESSION['status'] ?? ''));
-
+        $is_admin = (int)($_SESSION['is_admin'] ?? 0);
         if ($adminsBypass && $is_admin === 1) {
-            return;
+            return; // admins bypass
         }
 
-        if ($email_verified !== 1) {
-            $email = $_SESSION['email'] ?? '';
-            $to = '/verify_profile.php';
-            if ($email !== '') $to .= '?email=' . urlencode($email);
-            header('Location: ' . $to);
-            exit;
-        }
-
-        if (!in_array($status, ['active', 'approved'], true)) {
-            header('Location: /pending_approval.php');
-            exit;
-        }
+        // Use bootstrap.php version
+        require_active_user();
     }
 }

@@ -1,6 +1,5 @@
 <?php
-require_once __DIR__ . '/config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+require_once __DIR__ . '/includes/bootstrap.php';
 if (empty($_SESSION['user_id'])) { header('Location: /login.php'); exit; }
 $user_id = (int)$_SESSION['user_id'];
 

@@ -1,8 +1,7 @@
 <?php
 // pending_approval.php — Account review gate (copy-paste ready)
-
-require_once __DIR__ . '/config.php';
-if (session_status() === PHP_SESSION_NONE) session_start();
+// Session and security handling centralized via bootstrap.php
+require_once __DIR__ . '/includes/bootstrap.php';
 
 // Must be signed in
 if (empty($_SESSION['user_id'])) {
