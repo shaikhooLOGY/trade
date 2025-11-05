@@ -68,15 +68,10 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
   }
 }
 
-// ---------- CSRF token ----------
-if (empty($_SESSION['csrf'])) {
-  try { $_SESSION['csrf'] = bin2hex(random_bytes(32)); }
-  catch (Throwable $e) { $_SESSION['csrf'] = bin2hex(openssl_random_pseudo_bytes(32)); }
-}
-
+// ---------- CSRF token (using unified system) ----------
 if (!function_exists('csrf_field')) {
   function csrf_field(): string {
-    $t = htmlspecialchars($_SESSION['csrf'] ?? '', ENT_QUOTES, 'UTF-8');
+    $t = htmlspecialchars(get_csrf_token(), ENT_QUOTES, 'UTF-8');
     return '<input type="hidden" name="csrf" value="'.$t.'">';
   }
 }
@@ -84,7 +79,7 @@ if (!function_exists('csrf_field')) {
 if (!function_exists('csrf_verify')) {
   function csrf_verify(): void {
     $sent = $_POST['csrf'] ?? $_GET['csrf'] ?? '';
-    if (empty($_SESSION['csrf']) || !hash_equals($_SESSION['csrf'], (string)$sent)) {
+    if (!validate_csrf($sent)) {
       http_response_code(400);
       exit('Bad CSRF token');
     }

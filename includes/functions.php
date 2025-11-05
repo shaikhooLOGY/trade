@@ -49,8 +49,9 @@ if (!function_exists('flash_get')) {
 ----------------------------------- */
 if (!function_exists('csrf_token')) {
     function csrf_token(): string {
-        // Bootstrap already handles this, provide helper for compatibility
-        return $_SESSION['csrf'] ?? '';
+        // Use unified CSRF token handler
+        require_once __DIR__ . '/security/csrf_unify.php';
+        return get_csrf_token();
     }
 }
 

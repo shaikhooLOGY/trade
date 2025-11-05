@@ -175,7 +175,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     exit;
 }
 
-$csrf = $_SESSION['csrf'] ?? '';
 $title_text = $is_edit ? 'Edit MTM Model' : 'Create MTM Model';
 $subtitle = $is_edit ? 'Update model details and presentation' : 'Set up a new structured trading program';
 
@@ -285,7 +284,7 @@ include __DIR__ . '/../header.php';
     </div>
 
     <form method="post" enctype="multipart/form-data" class="form-container">
-        <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf) ?>">
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
 
         <div class="form-group">
             <label class="form-label">Model Title *</label>

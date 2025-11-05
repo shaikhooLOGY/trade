@@ -118,20 +118,5 @@ function csrf_api_middleware(?string $customToken = null): bool {
     return true;
 }
 
-/**
- * Regenerate CSRF token (use carefully, typically after login)
- * 
- * @return string New CSRF token
- */
-function csrf_regenerate(): string {
-    // Clear existing tokens
-    unset($_SESSION['csrf_token'], $_SESSION['csrf']);
-    
-    // Generate new token
-    return csrf_token();
-}
-
 // Auto-generate token on first load if not exists
-if (empty($_SESSION['csrf_token']) && empty($_SESSION['csrf'])) {
-    csrf_token();
-}
+// Token generation is now handled by the unified system in csrf_unify.php

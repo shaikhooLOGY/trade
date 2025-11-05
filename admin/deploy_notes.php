@@ -129,7 +129,7 @@ if (getv('export') === 'csv') {
 
 // ----- Create / Update -----
 $flash = '';
-if ($_SERVER['REQUEST_METHOD']==='POST' && post('csrf') === $_SESSION['csrf']) {
+if ($_SERVER['REQUEST_METHOD']==='POST' && validate_csrf(post('csrf'))) {
     $id = (int)post('id',0);
     
     // Handle both old and new field formats
@@ -694,7 +694,7 @@ if (!empty($rows)) {
       <h2><?= $edit ? 'Edit Note #' . (int)$edit['id'] : 'Create New Note' ?></h2>
       
       <form method="post" id="deployForm">
-        <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+        <input type="hidden" name="csrf" value="<?= h(get_csrf_token()) ?>">
         <input type="hidden" name="id" value="<?= (int)($edit['id'] ?? 0) ?>">
         
         <div class="row-3">
@@ -1070,7 +1070,7 @@ function scanFiles() {
     fetch('?action=scan_files&hours=4', {
         method: 'GET',
         headers: {
-            'X-CSRF-Token': '<?= h($_SESSION['csrf']) ?>'
+            'X-CSRF-Token': '<?= h(get_csrf_token()) ?>'
         }
     })
     .then(response => response.json())
@@ -1349,9 +1349,9 @@ function createTable() {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'X-CSRF-Token': '<?= h($_SESSION['csrf']) ?>'
+            'X-CSRF-Token': '<?= h(get_csrf_token()) ?>'
         },
-        body: 'action=create_table&csrf=<?= h($_SESSION['csrf']) ?>'
+        body: 'action=create_table&csrf=<?= h(get_csrf_token()) ?>'
     })
     .then(response => response.json())
     .then(data => {

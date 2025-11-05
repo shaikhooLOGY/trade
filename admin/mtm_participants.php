@@ -527,7 +527,7 @@ include __DIR__ . '/../header.php';
                         <div class="enrollment-actions">
                             <?php if ($enrollment['status'] === 'pending'): ?>
                                 <form method="post" style="display: inline;">
-                                    <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['csrf'] ?? '') ?>">
+                                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
                                     <input type="hidden" name="enrollment_id" value="<?= $enrollment['id'] ?>">
                                     <button type="submit" name="action" value="approve" class="btn btn-success"
                                             onclick="return confirm('Approve this enrollment request?')">Approve</button>
@@ -536,7 +536,7 @@ include __DIR__ . '/../header.php';
                                 <button type="button" class="btn btn-danger" onclick="showRejectModal(<?= $enrollment['id'] ?>)">Reject</button>
                             <?php elseif ($enrollment['status'] === 'approved'): ?>
                                 <form method="post" style="display: inline;">
-                                    <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['csrf'] ?? '') ?>">
+                                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
                                     <input type="hidden" name="enrollment_id" value="<?= $enrollment['id'] ?>">
                                     <button type="submit" name="action" value="drop" class="btn btn-danger"
                                             onclick="return confirm('Drop this participant from the MTM?')">Drop</button>
@@ -557,7 +557,7 @@ include __DIR__ . '/../header.php';
     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 24px; border-radius: 8px; max-width: 400px; width: 90%;">
         <h3 style="margin: 0 0 16px;">Reject Enrollment</h3>
         <form method="post">
-            <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['csrf'] ?? '') ?>">
+            <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
             <input type="hidden" name="enrollment_id" id="reject_enrollment_id">
             <input type="hidden" name="action" value="reject">
 

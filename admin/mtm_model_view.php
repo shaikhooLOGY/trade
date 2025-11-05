@@ -790,14 +790,14 @@ include __DIR__ . '/../header.php';
                         <div class="task-actions" style="gap:6px; flex-wrap:wrap;">
                             <?php if (!$isFirst): ?>
                                 <form method="post" style="display:inline;">
-                                    <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['csrf'] ?? '') ?>">
+                                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
                                     <input type="hidden" name="task_id" value="<?= (int)$task['id'] ?>">
                                     <button type="submit" name="action" value="move_up" class="btn btn-secondary" title="Move up within <?= htmlspecialchars($heading) ?>">↑ Move Up</button>
                                 </form>
                             <?php endif; ?>
                             <?php if (!$isLast): ?>
                                 <form method="post" style="display:inline;">
-                                    <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['csrf'] ?? '') ?>">
+                                    <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
                                     <input type="hidden" name="task_id" value="<?= (int)$task['id'] ?>">
                                     <button type="submit" name="action" value="move_down" class="btn btn-secondary" title="Move down within <?= htmlspecialchars($heading) ?>">↓ Move Down</button>
                                 </form>
