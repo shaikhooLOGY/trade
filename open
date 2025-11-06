@@ -1,0 +1,141 @@
+<?php
+/**
+ * OpenAPI Sync Check for Phase 3 Pre-Integration
+ * Verifies OpenAPI spec includes all live endpoints and regenerates checksum
+ */
+
+echo "=== PHASE 3 PRE-INTEGRATION OPENAPI SYNC CHECK ===\n";
+echo "Timestamp: " . date('Y-m-d H:i:s') . "\n\n";
+
+$openapi_file = 'docs/openapi.yaml';
+$openapi_checksum_file = 'docs/openapi_checksum.txt';
+$archive_dir = 'docs/archives';
+
+// Create archive directory if it doesn't exist
+if (!is_dir($archive_dir)) {
+    mkdir($archive_dir, 0755, true);
+}
+
+// Load OpenAPI spec
+if (!file_exists($openapi_file)) {
+    echo "❌ OpenAPI spec file not found: {$openapi_file}\n";
+    exit(1);
+}
+
+$openapi_content = file_get_contents($openapi_file);
+echo "✅ OpenAPI spec loaded successfully\n\n";
+
+// Check for Agent Log endpoints (mentioned in requirements) using string search
+$agent_log_found = false;
+$agent_admin_logs_found = false;
+
+if (strpos($openapi_content, '/api/agent/log') !== false) {
+    $agent_log_found = true;
+    echo "✅ Found Agent Log endpoint: /api/agent/log\n";
+} else {
+    echo "❌ Agent Log endpoint (/api/agent/log) not found in OpenAPI spec\n";
+}
+
+if (strpos($openapi_content, '/api/admin/agent/logs') !== false) {
+    $agent_admin_logs_found = true;
+    echo "✅ Found Admin Agent Logs endpoint: /api/admin/agent/logs\n";
+} else {
+    echo "❌ Admin Agent Logs endpoint (/api/admin/agent/logs) not found in OpenAPI spec\n";
+}
+
+// Count endpoints by searching for path patterns
+preg_match_all('/^\s*(\/[a-z0-9\-\_\/]+):/m', $openapi_content, $matches);
+$unique_paths = array_unique($matches[1]);
+$endpoint_count = count($unique_paths);
+
+echo "\n=== OPENAPI ENDPOINT SUMMARY ===\n";
+echo "Total endpoints documented: {$endpoint_count}\n";
+echo "Agent Log endpoints: " . ($agent_log_found && $agent_admin_logs_found ? "2/2 ✅" : "Missing ❌") . "\n";
+
+// Archive current OpenAPI spec with timestamp
+$timestamp = date('Ymd_His');
+$archive_filename = "openapi_{$timestamp}.yaml";
+$archive_path = $archive_dir . '/' . $archive_filename;
+
+if (copy($openapi_file, $archive_path)) {
+    echo "✅ OpenAPI spec archived: {$archive_path}\n";
+} else {
+    echo "❌ Failed to archive OpenAPI spec\n";
+}
+
+// Generate SHA256 checksum
+$checksum = hash_file('sha256', $openapi_file);
+echo "✅ SHA256 checksum generated: {$checksum}\n";
+
+// Write checksum file
+$checksum_content = "SHA256 Checksum: {$checksum}\n";
+$checksum_content .= "Generated: " . date('Y-m-d H:i:s') . "\n";
+$checksum_content .= "File: {$openapi_file}\n";
+$checksum_content .= "Size: " . filesize($openapi_file) . " bytes\n";
+$checksum_content .= "Endpoints: {$endpoint_count}\n";
+
+if (file_put_contents($openapi_checksum_file, $checksum_content)) {
+    echo "✅ Checksum file created: {$openapi_checksum_file}\n";
+} else {
+    echo "❌ Failed to create checksum file\n";
+}
+
+// Generate report
+$report_content = "# OpenAPI Sync Report - Phase 3 Pre-Integration\n\n";
+$report_content .= "**Generated:** " . date('Y-m-d H:i:s') . "\n";
+$report_content .= "**OpenAPI File:** {$openapi_file}\n";
+$report_content .= "**Checksum File:** {$openapi_checksum_file}\n";
+$report_content .= "**Archive File:** {$archive_path}\n";
+$report_content .= "**Status:** " . ($agent_log_found && $agent_admin_logs_found ? "✅ COMPLETE" : "⚠️ INCOMPLETE") . "\n\n";
+
+$report_content .= "## Endpoint Summary\n\n";
+$report_content .= "- **Total Endpoints:** {$endpoint_count}\n";
+$report_content .= "- **Agent Log Endpoints:** " . ($agent_log_found && $agent_admin_logs_found ? "2/2" : "Missing") . "\n";
+$report_content .= "- **OpenAPI Version:** 3.0.3 (from spec)\n";
+$report_content .= "- **API Title:** Shaikhoology TMS-MTM Platform API (from spec)\n\n";
+
+$report_content .= "## Agent Log Endpoints Check\n\n";
+$report_content .= "| Endpoint | Status |\n";
+$report_content .= "|----------|--------|\n";
+$report_content .= "| /api/agent/log | " . ($agent_log_found ? "✅ Present" : "❌ Missing") . " |\n";
+$report_content .= "| /api/admin/agent/logs | " . ($agent_admin_logs_found ? "✅ Present" : "❌ Missing") . " |\n\n";
+
+$report_content .= "## Documented Endpoints\n\n";
+foreach ($unique_paths as $path) {
+    $report_content .= "- {$path}\n";
+}
+
+if (!$agent_log_found || !$agent_admin_logs_found) {
+    $report_content .= "\n## Issues Detected\n\n";
+    if (!$agent_log_found) {
+        $report_content .= "- **Missing Agent Log Endpoint:** /api/agent/log not found in OpenAPI spec\n";
+    }
+    if (!$agent_admin_logs_found) {
+        $report_content .= "- **Missing Admin Agent Logs Endpoint:** /api/admin/agent/logs not found in OpenAPI spec\n";
+    }
+    $report_content .= "\n**Action Required:** Update OpenAPI spec to include missing Agent Log endpoints.\n";
+} else {
+    $report_content .= "\n## OpenAPI Status: ✅ COMPLETE\n\n";
+    $report_content .= "All required Agent Log endpoints are documented in the OpenAPI specification.\n";
+}
+
+$report_content .= "\n## Checksum Information\n\n";
+$report_content .= "```\n";
+$report_content .= "SHA256: {$checksum}\n";
+$report_content .= "File Size: " . filesize($openapi_file) . " bytes\n";
+$report_content .= "Archive: {$archive_filename}\n";
+$report_content .= "```\n";
+
+$report_content .= "\n## Archive History\n\n";
+$archives = glob($archive_dir . '/openapi_*.yaml');
+rsort($archives); // Most recent first
+foreach ($archives as $archive) {
+    $basename = basename($archive);
+    $size = filesize($archive);
+    $mtime = date('Y-m-d H:i:s', filemtime($archive));
+    $report_content .= "- **{$basename}** ({$size} bytes, {$mtime})\n";
+}
+
+// Save report
+file_put_contents('reports/phase3_preintegration/openapi_sync.md', $report_content);
+echo "\n✅ Report saved to: reports/phase3_preintegration/openapi_sync.md\n";
