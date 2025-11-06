@@ -1,0 +1,49 @@
+{
+    "timestamp": "2025-11-06T14:41:19+05:30",
+    "tests": [
+        {
+            "id": 1,
+            "name": "Admin API - No Auth",
+            "method": "GET",
+            "url": "\/api\/admin\/participants.php",
+            "expected_status": "401",
+            "actual_status": "00",
+            "passed": false,
+            "cookies": "",
+            "post_data": "",
+            "description": "Should return 401 for unauthenticated access to admin endpoint",
+            "timestamp": "2025-11-06T14:41:40+05:30"
+        },
+        {
+            "id": 2,
+            "name": "Profile API - No Auth",
+            "method": "GET",
+            "url": "\/api\/profile\/me.php",
+            "expected_status": "401",
+            "actual_status": "01",
+            "passed": false,
+            "cookies": "",
+            "post_data": "",
+            "description": "Should return 401 for unauthenticated access to profile endpoint",
+            "timestamp": "2025-11-06T14:41:40+05:30"
+        },
+        {
+            "id": 3,
+            "name": "Trades API - No Auth",
+            "method": "GET",
+            "url": "\/api\/trades\/list.php",
+            "expected_status": "401",
+            "actual_status": "01",
+            "passed": false,
+            "cookies": "",
+            "post_data": "",
+            "description": "Should return 401 for unauthenticated access to trades endpoint",
+            "timestamp": "2025-11-06T14:41:40+05:30"
+        }
+    ],
+    "summary": {
+        "total": 3,
+        "passed": 0,
+        "failed": 3
+    }
+}

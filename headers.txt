@@ -1,0 +1,15 @@
+HTTP/1.1 401 Unauthorized
+Host: 127.0.0.1:8082
+Date: Thu, 06 Nov 2025 09:43:12 GMT
+Connection: close
+X-Frame-Options: SAMEORIGIN
+Referrer-Policy: strict-origin-when-cross-origin
+X-XSS-Protection: 0
+Content-Security-Policy: default-src 'self' 'unsafe-inline' https: data:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:;
+Set-Cookie: PHPSESSID=128e7dfd910a143d05e548072d1ed80b; expires=Thu, 06 Nov 2025 21:43:12 GMT; Max-Age=43200; path=/; HttpOnly; SameSite=Lax
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Pragma: no-cache
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-cache, must-revalidate
+X-Content-Type-Options: nosniff
+

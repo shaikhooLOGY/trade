@@ -12,129 +12,129 @@
             "success_count": 12,
             "rate_limited_count": 0,
             "error_count": 0,
-            "total_time_seconds": 0.74,
-            "requests_per_second": 16.22
+            "total_time_seconds": 0.66,
+            "requests_per_second": 18.18
         },
         "detailed_results": [
             {
                 "request_num": 1,
                 "status_code": 200,
-                "response_time": 76.72,
+                "response_time": 12.88,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:34.950"
+                "timestamp": "08:50:17.880"
             },
             {
                 "request_num": 2,
                 "status_code": 200,
-                "response_time": 3.86,
+                "response_time": 3.9,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.009"
+                "timestamp": "08:50:17.939"
             },
             {
                 "request_num": 3,
                 "status_code": 200,
-                "response_time": 6.71,
+                "response_time": 3.36,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.066"
+                "timestamp": "08:50:17.997"
             },
             {
                 "request_num": 4,
                 "status_code": 200,
-                "response_time": 5.45,
+                "response_time": 3.79,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.127"
+                "timestamp": "08:50:18.056"
             },
             {
                 "request_num": 5,
                 "status_code": 200,
-                "response_time": 7.09,
+                "response_time": 3.32,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.188"
+                "timestamp": "08:50:18.114"
             },
             {
                 "request_num": 6,
                 "status_code": 200,
-                "response_time": 6.94,
+                "response_time": 4.58,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.250"
+                "timestamp": "08:50:18.173"
             },
             {
                 "request_num": 7,
                 "status_code": 200,
-                "response_time": 5.48,
+                "response_time": 4.83,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.309"
+                "timestamp": "08:50:18.232"
             },
             {
                 "request_num": 8,
                 "status_code": 200,
-                "response_time": 6.35,
+                "response_time": 5.58,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.370"
+                "timestamp": "08:50:18.289"
             },
             {
                 "request_num": 9,
                 "status_code": 200,
-                "response_time": 7.2,
+                "response_time": 5.34,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.432"
+                "timestamp": "08:50:18.349"
             },
             {
                 "request_num": 10,
                 "status_code": 200,
-                "response_time": 3.33,
+                "response_time": 5.41,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.491"
+                "timestamp": "08:50:18.410"
             },
             {
                 "request_num": 11,
                 "status_code": 200,
-                "response_time": 5.19,
+                "response_time": 4.24,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.551"
+                "timestamp": "08:50:18.465"
             },
             {
                 "request_num": 12,
                 "status_code": 200,
-                "response_time": 5.64,
+                "response_time": 4.14,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.612"
+                "timestamp": "08:50:18.522"
             }
         ]
     },
@@ -151,129 +151,129 @@
             "success_count": 0,
             "rate_limited_count": 0,
             "error_count": 12,
-            "total_time_seconds": 0.69,
-            "requests_per_second": 17.39
+            "total_time_seconds": 0.66,
+            "requests_per_second": 18.18
         },
         "detailed_results": [
             {
                 "request_num": 1,
                 "status_code": 401,
-                "response_time": 18.7,
+                "response_time": 4.03,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.631"
+                "timestamp": "08:50:18.526"
             },
             {
                 "request_num": 2,
                 "status_code": 401,
-                "response_time": 7.47,
+                "response_time": 5.35,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.693"
+                "timestamp": "08:50:18.587"
             },
             {
                 "request_num": 3,
                 "status_code": 401,
-                "response_time": 12.08,
+                "response_time": 4.49,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.760"
+                "timestamp": "08:50:18.646"
             },
             {
                 "request_num": 4,
                 "status_code": 401,
-                "response_time": 8.15,
+                "response_time": 3.26,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.822"
+                "timestamp": "08:50:18.700"
             },
             {
                 "request_num": 5,
                 "status_code": 401,
-                "response_time": 7.78,
+                "response_time": 10.65,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.885"
+                "timestamp": "08:50:18.763"
             },
             {
                 "request_num": 6,
                 "status_code": 401,
-                "response_time": 4.45,
+                "response_time": 5.33,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.941"
+                "timestamp": "08:50:18.823"
             },
             {
                 "request_num": 7,
                 "status_code": 401,
-                "response_time": 3.61,
+                "response_time": 6.66,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:35.999"
+                "timestamp": "08:50:18.885"
             },
             {
                 "request_num": 8,
                 "status_code": 401,
-                "response_time": 2.6,
+                "response_time": 6.85,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.057"
+                "timestamp": "08:50:18.947"
             },
             {
                 "request_num": 9,
                 "status_code": 401,
-                "response_time": 2.56,
+                "response_time": 3.39,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.115"
+                "timestamp": "08:50:19.005"
             },
             {
                 "request_num": 10,
                 "status_code": 401,
-                "response_time": 6.61,
+                "response_time": 4.09,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.176"
+                "timestamp": "08:50:19.065"
             },
             {
                 "request_num": 11,
                 "status_code": 401,
-                "response_time": 4.53,
+                "response_time": 3.57,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.236"
+                "timestamp": "08:50:19.123"
             },
             {
                 "request_num": 12,
                 "status_code": 401,
-                "response_time": 6.7,
+                "response_time": 5.27,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.298"
+                "timestamp": "08:50:19.179"
             }
         ]
     },
@@ -290,129 +290,129 @@
             "success_count": 12,
             "rate_limited_count": 0,
             "error_count": 0,
-            "total_time_seconds": 0.62,
-            "requests_per_second": 19.35
+            "total_time_seconds": 0.61,
+            "requests_per_second": 19.67
         },
         "detailed_results": [
             {
                 "request_num": 1,
                 "status_code": 200,
-                "response_time": 2.01,
+                "response_time": 1.11,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.300"
+                "timestamp": "08:50:19.180"
             },
             {
                 "request_num": 2,
                 "status_code": 200,
-                "response_time": 2.48,
+                "response_time": 1.6,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.357"
+                "timestamp": "08:50:19.236"
             },
             {
                 "request_num": 3,
                 "status_code": 200,
-                "response_time": 2.7,
+                "response_time": 1.46,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.415"
+                "timestamp": "08:50:19.288"
             },
             {
                 "request_num": 4,
                 "status_code": 200,
-                "response_time": 2.66,
+                "response_time": 1.58,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.470"
+                "timestamp": "08:50:19.345"
             },
             {
                 "request_num": 5,
                 "status_code": 200,
-                "response_time": 0.94,
+                "response_time": 2.02,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.523"
+                "timestamp": "08:50:19.402"
             },
             {
                 "request_num": 6,
                 "status_code": 200,
-                "response_time": 1.05,
+                "response_time": 1.65,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.579"
+                "timestamp": "08:50:19.459"
             },
             {
                 "request_num": 7,
                 "status_code": 200,
-                "response_time": 1.38,
+                "response_time": 0.91,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.635"
+                "timestamp": "08:50:19.514"
             },
             {
                 "request_num": 8,
                 "status_code": 200,
-                "response_time": 1.64,
+                "response_time": 1.03,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.692"
+                "timestamp": "08:50:19.570"
             },
             {
                 "request_num": 9,
                 "status_code": 200,
-                "response_time": 1.17,
+                "response_time": 1.15,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.745"
+                "timestamp": "08:50:19.621"
             },
             {
                 "request_num": 10,
                 "status_code": 200,
-                "response_time": 1.66,
+                "response_time": 2.44,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.802"
+                "timestamp": "08:50:19.679"
             },
             {
                 "request_num": 11,
                 "status_code": 200,
-                "response_time": 2.72,
+                "response_time": 1.49,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.856"
+                "timestamp": "08:50:19.735"
             },
             {
                 "request_num": 12,
                 "status_code": 200,
-                "response_time": 2.41,
+                "response_time": 2.1,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.913"
+                "timestamp": "08:50:19.793"
             }
         ]
     },
@@ -429,129 +429,129 @@
             "success_count": 12,
             "rate_limited_count": 0,
             "error_count": 0,
-            "total_time_seconds": 0.66,
-            "requests_per_second": 18.18
+            "total_time_seconds": 0.69,
+            "requests_per_second": 17.39
         },
         "detailed_results": [
             {
                 "request_num": 1,
                 "status_code": 200,
-                "response_time": 8.51,
+                "response_time": 6.91,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.922"
+                "timestamp": "08:50:19.800"
             },
             {
                 "request_num": 2,
                 "status_code": 200,
-                "response_time": 7.87,
+                "response_time": 6.96,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:36.985"
+                "timestamp": "08:50:19.862"
             },
             {
                 "request_num": 3,
                 "status_code": 200,
-                "response_time": 3.14,
+                "response_time": 6.46,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:37.043"
+                "timestamp": "08:50:19.923"
             },
             {
                 "request_num": 4,
                 "status_code": 200,
-                "response_time": 4.03,
+                "response_time": 6.97,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:37.102"
+                "timestamp": "08:50:19.985"
             },
             {
                 "request_num": 5,
                 "status_code": 200,
-                "response_time": 4.77,
+                "response_time": 3.94,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:37.160"
+                "timestamp": "08:50:20.041"
             },
             {
                 "request_num": 6,
                 "status_code": 200,
-                "response_time": 8.17,
+                "response_time": 3.47,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:37.223"
+                "timestamp": "08:50:20.100"
             },
             {
                 "request_num": 7,
                 "status_code": 200,
-                "response_time": 6.78,
+                "response_time": 5.33,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:37.284"
+                "timestamp": "08:50:20.159"
             },
             {
                 "request_num": 8,
-                "status_code": 200,
-                "response_time": 8,
-                "is_429": false,
-                "has_retry_after": false,
-                "retry_after_value": null,
-                "rate_limited": false,
-                "timestamp": "08:21:37.344"
-            },
-            {
-                "request_num": 9,
-                "status_code": 200,
-                "response_time": 5.79,
-                "is_429": false,
-                "has_retry_after": false,
-                "retry_after_value": null,
-                "rate_limited": false,
-                "timestamp": "08:21:37.404"
-            },
-            {
-                "request_num": 10,
-                "status_code": 200,
-                "response_time": 4.17,
-                "is_429": false,
-                "has_retry_after": false,
-                "retry_after_value": null,
-                "rate_limited": false,
-                "timestamp": "08:21:37.459"
-            },
-            {
-                "request_num": 11,
-                "status_code": 200,
-                "response_time": 6.08,
-                "is_429": false,
-                "has_retry_after": false,
-                "retry_after_value": null,
-                "rate_limited": false,
-                "timestamp": "08:21:37.518"
-            },
-            {
-                "request_num": 12,
                 "status_code": 200,
                 "response_time": 3.87,
                 "is_429": false,
                 "has_retry_after": false,
                 "retry_after_value": null,
                 "rate_limited": false,
-                "timestamp": "08:21:37.574"
+                "timestamp": "08:50:20.218"
+            },
+            {
+                "request_num": 9,
+                "status_code": 200,
+                "response_time": 35.79,
+                "is_429": false,
+                "has_retry_after": false,
+                "retry_after_value": null,
+                "rate_limited": false,
+                "timestamp": "08:50:20.312"
+            },
+            {
+                "request_num": 10,
+                "status_code": 200,
+                "response_time": 4.25,
+                "is_429": false,
+                "has_retry_after": false,
+                "retry_after_value": null,
+                "rate_limited": false,
+                "timestamp": "08:50:20.369"
+            },
+            {
+                "request_num": 11,
+                "status_code": 200,
+                "response_time": 4.08,
+                "is_429": false,
+                "has_retry_after": false,
+                "retry_after_value": null,
+                "rate_limited": false,
+                "timestamp": "08:50:20.425"
+            },
+            {
+                "request_num": 12,
+                "status_code": 200,
+                "response_time": 4.91,
+                "is_429": false,
+                "has_retry_after": false,
+                "retry_after_value": null,
+                "rate_limited": false,
+                "timestamp": "08:50:20.485"
             }
         ]
     }

@@ -1,0 +1,7 @@
+HTTP/1.1 200 OK
+Host: 127.0.0.1:8082
+Date: Thu, 06 Nov 2025 09:44:42 GMT
+Connection: close
+X-Powered-By: PHP/8.4.14
+Content-type: text/html; charset=UTF-8
+

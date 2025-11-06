@@ -1,0 +1,18 @@
+HTTP/1.1 200 OK
+Host: 127.0.0.1:8082
+Date: Thu, 06 Nov 2025 09:43:45 GMT
+Connection: close
+X-Frame-Options: SAMEORIGIN
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+X-XSS-Protection: 0
+Content-Security-Policy: default-src 'self' 'unsafe-inline' https: data:; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https:; script-src 'self' 'unsafe-inline' https:;
+Set-Cookie: PHPSESSID=8b3322cfd21729e600574d199bfa535c; expires=Thu, 06 Nov 2025 21:43:45 GMT; Max-Age=43200; path=/; HttpOnly; SameSite=Lax
+Expires: Thu, 19 Nov 1981 08:52:00 GMT
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Content-Type: application/json
+Access-Control-Allow-Origin: *
+Access-Control-Allow-Methods: GET, OPTIONS
+Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With
+

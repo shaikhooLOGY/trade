@@ -1,0 +1,120 @@
+{
+    "timestamp": "2025-11-06T09:12:55+00:00",
+    "tests": [
+        {
+            "name": "Admin API - Unauthenticated",
+            "method": "GET",
+            "url": "\/api\/admin\/participants.php",
+            "expected_status": "401",
+            "actual_status": "200",
+            "passed": false,
+            "description": "Should return 401 for unauthenticated access to admin endpoint",
+            "timestamp": "2025-11-06T09:12:55+00:00"
+        },
+        {
+            "name": "Profile API - Unauthenticated",
+            "method": "GET",
+            "url": "\/api\/profile\/me.php",
+            "expected_status": "401",
+            "actual_status": "401",
+            "passed": true,
+            "description": "Should return 401 for unauthenticated access to profile endpoint",
+            "timestamp": "2025-11-06T09:12:56+00:00"
+        },
+        {
+            "name": "Trades API - Unauthenticated",
+            "method": "GET",
+            "url": "\/api\/trades\/list.php",
+            "expected_status": "401",
+            "actual_status": "401",
+            "passed": true,
+            "description": "Should return 401 for unauthenticated access to trades endpoint",
+            "timestamp": "2025-11-06T09:12:56+00:00"
+        },
+        {
+            "name": "Admin API - Wrong Method",
+            "method": "POST",
+            "url": "\/api\/admin\/participants.php",
+            "expected_status": "405",
+            "actual_status": "200",
+            "passed": false,
+            "description": "Should return 405 for POST method on GET-only endpoint",
+            "timestamp": "2025-11-06T09:12:56+00:00"
+        },
+        {
+            "name": "Profile API - Wrong Method",
+            "method": "POST",
+            "url": "\/api\/profile\/me.php",
+            "expected_status": "405",
+            "actual_status": "405",
+            "passed": true,
+            "description": "Should return 405 for POST method on GET-only endpoint",
+            "timestamp": "2025-11-06T09:12:56+00:00"
+        },
+        {
+            "name": "Profile API - No Session",
+            "method": "GET",
+            "url": "\/api\/profile\/me.php",
+            "expected_status": "401",
+            "actual_status": "401",
+            "passed": true,
+            "description": "Should return 401 for requests without valid session",
+            "timestamp": "2025-11-06T09:12:56+00:00"
+        },
+        {
+            "name": "Login Form - CSRF Protection",
+            "method": "GET",
+            "url": "\/login.php",
+            "expected_status": "200",
+            "actual_status": "200",
+            "passed": true,
+            "description": "Login page should be accessible but include CSRF protection",
+            "timestamp": "2025-11-06T09:12:56+00:00"
+        },
+        {
+            "name": "Invalid Endpoint",
+            "method": "GET",
+            "url": "\/api\/nonexistent.php",
+            "expected_status": "404",
+            "actual_status": "404",
+            "passed": true,
+            "description": "Should return 404 for non-existent endpoints",
+            "timestamp": "2025-11-06T09:12:56+00:00"
+        },
+        {
+            "name": "Admin Without API",
+            "method": "GET",
+            "url": "\/api\/admin\/nonexistent.php",
+            "expected_status": "404",
+            "actual_status": "404",
+            "passed": true,
+            "description": "Should return 404 for non-existent admin endpoints",
+            "timestamp": "2025-11-06T09:12:56+00:00"
+        },
+        {
+            "name": "Health Check",
+            "method": "GET",
+            "url": "\/api\/health.php",
+            "expected_status": "200",
+            "actual_status": "200",
+            "passed": true,
+            "description": "Health endpoint should be publicly accessible",
+            "timestamp": "2025-11-06T09:12:56+00:00"
+        },
+        {
+            "name": "Registration Security",
+            "method": "GET",
+            "url": "\/register.php",
+            "expected_status": "200",
+            "actual_status": "200",
+            "passed": true,
+            "description": "Registration page should be accessible",
+            "timestamp": "2025-11-06T09:12:56+00:00"
+        }
+    ],
+    "summary": {
+        "total": 11,
+        "passed": 9,
+        "failed": 2
+    }
+}
