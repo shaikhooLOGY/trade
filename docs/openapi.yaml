@@ -1,8 +1,16 @@
 openapi: 3.0.3
 info:
-  title: Shaikhoology TMS-MTM Platform API
+  title: Shaikhoology TMS-MTM Platform API - Unified Core
   description: |
-    Enterprise Trading Management System API with Phase 3 Compliance Implementation.
+    Enterprise Trading Management System API with Unified Core Implementation.
+    
+    ## Unified Core Features
+    - **Single Bootstrap System**: `/core/bootstrap.php` provides unified initialization for all endpoints
+    - **Enhanced Security**: Database-backed rate limiting, CSRF protection, and security hardening
+    - **Comprehensive Audit**: Authoritative audit trail system with event logging and retention policies
+    - **Standardized APIs**: Consistent JSON response envelopes across all 25+ endpoints
+    - **Agent Monitoring**: Complete agent activity tracking and admin oversight
+    - **Phase 3 Compliance**: Full regulatory compliance with audit trails and security monitoring
     
     ## Authentication & Authorization
     The platform uses session-based authentication:
@@ -31,28 +39,16 @@ info:
     }
     ```
     
-    ## Phase 3 Compliance Features
-    - **Audit Trail System**: Comprehensive logging of all user actions and system events
-    - **Security Event Monitoring**: CSRF violations, rate limiting, unauthorized access attempts
-    - **Compliance Reporting**: Built-in audit log viewing and export capabilities
-    - **Data Retention Policies**: Automated cleanup of old audit events
-    - **Request Tracking**: Every API call is tracked with unique request IDs
+    ## Unified Core Security Features
+    - **Database-backed Rate Limiting**: GET=120/min, MUT=30/min, ADMIN=10/min per user/IP
+    - **Enhanced CSRF Protection**: Timing-safe validation with automatic rotation
+    - **Idempotency Support**: X-Idempotency-Key header with 10-minute window
+    - **Session Security**: Fingerprint-based hijacking detection
+    - **Input Sanitization**: Multi-layer SQL injection prevention
+    - **Comprehensive Audit**: All actions logged with authoritative audit trail
+    - **Request/Response Tracking**: Unique identifiers for all API calls
     
-    ## Rate Limiting
-    - **API Endpoints**: 5-10 requests per minute (session-based)
-    - **Admin Endpoints**: No rate limiting for audit log access
-    - **Audit Endpoints**: Special rate limits for compliance operations
-    - **Rate Limit Errors**: Return 429 status with proper retry headers
-    
-    ## Security Features
-    - CSRF protection for all mutating operations
-    - Session-based rate limiting
-    - SQL injection protection via prepared statements
-    - Input validation and sanitization
-    - Audit logging for compliance and security monitoring
-    - Request/response tracking with unique identifiers
-    
-  version: 2.1.0
+  version: 2.2.0
   contact:
     name: Shaikhoology Platform Team
     email: support@shaikhoology.com

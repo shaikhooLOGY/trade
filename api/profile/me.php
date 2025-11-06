@@ -1,43 +1,43 @@
 <?php
 /**
  * api/profile/me.php
- * 
- * Profile API - Get current user profile
+ *
+ * Standardized Profile API - Get current user profile
  * GET /api/profile/me.php
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
 
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
+    header('HTTP/1.1 200 OK');
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, X-Requested-With, X-Idempotency-Key, X-CSRF-Token');
+    exit;
 }
 
 // Only allow GET requests
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    json_fail('METHOD_NOT_ALLOWED', 'Only GET method is allowed');
+    json_error('Method not allowed', 405);
 }
 
+// Apply rate limiting
+api_rate_limit('profile_me', 60);
+
+// Require authentication
+require_login_json();
+
 try {
-    // Require authentication
-    $user = require_login_json();
-    $userId = (int)$user['id'];
-    
+    $userId = (int)$_SESSION['user_id'];
     global $mysqli;
     
-    // Get comprehensive user profile data
+    // Get user profile data
     $stmt = $mysqli->prepare("
-        SELECT 
-            id, name, display_name, email, role, status, email_verified,
-            bio, location, timezone, preferences, profile_completion_score,
-            created_at, updated_at, last_login
-        FROM users 
+        SELECT
+            id, name, email, role, status, email_verified,
+            trading_capital, funds_available, created_at, updated_at
+        FROM users
         WHERE id = ?
     ");
     
@@ -52,15 +52,7 @@ try {
     $stmt->close();
     
     if (!$profile) {
-        json_not_found('User profile');
-    }
-    
-    // Parse preferences if available
-    if (!empty($profile['preferences'])) {
-        $decodedPreferences = json_decode($profile['preferences'], true);
-        if (json_last_error() === JSON_ERROR_NONE) {
-            $profile['preferences'] = $decodedPreferences;
-        }
+        json_error('User profile not found', 404);
     }
     
     // Get additional statistics
@@ -69,19 +61,17 @@ try {
     try {
         // Get trade statistics
         $tradeStmt = $mysqli->prepare("
-            SELECT 
+            SELECT
                 COUNT(*) as total_trades,
-                COUNT(CASE WHEN outcome = 'win' THEN 1 END) as winning_trades,
-                SUM(CASE 
-                    WHEN side = 'buy' THEN quantity * (COALESCE(close_price, price) - price)
-                    ELSE quantity * (price - COALESCE(close_price, price))
-                END) as total_pnl
-            FROM trades 
-            WHERE (trader_id = ? OR user_id = ?)
+                COUNT(CASE WHEN outcome = 'WIN' THEN 1 END) as winning_trades,
+                COUNT(CASE WHEN outcome = 'OPEN' THEN 1 END) as open_trades,
+                COALESCE(SUM(CASE WHEN outcome = 'WIN' THEN 1 WHEN outcome = 'LOSS' THEN -1 ELSE 0 END), 0) as net_outcome
+            FROM trades
+            WHERE user_id = ? AND (deleted_at IS NULL OR deleted_at = '')
         ");
         
         if ($tradeStmt) {
-            $tradeStmt->bind_param('ii', $userId, $userId);
+            $tradeStmt->bind_param('i', $userId);
             $tradeStmt->execute();
             $tradeResult = $tradeStmt->get_result();
             $stats = $tradeResult->fetch_assoc();
@@ -90,12 +80,12 @@ try {
         
         // Get enrollment statistics
         $enrollmentStmt = $mysqli->prepare("
-            SELECT 
+            SELECT
                 COUNT(*) as total_enrollments,
-                COUNT(CASE WHEN status = 'approved' THEN 1 END) as approved_enrollments,
-                COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_enrollments
-            FROM mtm_enrollments 
-            WHERE user_id = ?
+                COUNT(CASE WHEN status = 'active' THEN 1 END) as active_enrollments,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_enrollments
+            FROM mtm_enrollments
+            WHERE trader_id = ?
         ");
         
         if ($enrollmentStmt) {
@@ -112,50 +102,45 @@ try {
         app_log('error', 'Profile stats query failed: ' . $e->getMessage());
     }
     
-    // Format response
+    // Format response using unified JSON envelope
     $profileData = [
         'id' => (int)$profile['id'],
         'name' => $profile['name'],
-        'display_name' => $profile['display_name'],
         'email' => $profile['email'],
         'role' => $profile['role'],
         'status' => $profile['status'],
         'email_verified' => (bool)$profile['email_verified'],
-        'bio' => $profile['bio'],
-        'location' => $profile['location'],
-        'timezone' => $profile['timezone'],
-        'preferences' => $profile['preferences'] ?? [],
-        'profile_completion_score' => (int)($profile['profile_completion_score'] ?? 0),
+        'trading_capital' => (float)($profile['trading_capital'] ?? 0),
+        'funds_available' => (float)($profile['funds_available'] ?? 0),
         'created_at' => $profile['created_at'],
         'updated_at' => $profile['updated_at'],
-        'last_login' => $profile['last_login'],
         'statistics' => [
             'trades' => [
                 'total' => (int)($stats['total_trades'] ?? 0),
                 'winning' => (int)($stats['winning_trades'] ?? 0),
-                'win_rate' => $stats['total_trades'] > 0 ? 
-                    round(($stats['winning_trades'] / $stats['total_trades']) * 100, 2) : 0,
-                'total_pnl' => round((float)($stats['total_pnl'] ?? 0), 2)
+                'open' => (int)($stats['open_trades'] ?? 0),
+                'net_outcome' => (int)($stats['net_outcome'] ?? 0),
+                'win_rate' => $stats['total_trades'] > 0 ?
+                    round(($stats['winning_trades'] / $stats['total_trades']) * 100, 2) : 0
             ],
             'enrollments' => [
                 'total' => (int)($stats['total_enrollments'] ?? 0),
-                'approved' => (int)($stats['approved_enrollments'] ?? 0),
-                'pending' => (int)($stats['pending_enrollments'] ?? 0)
+                'active' => (int)($stats['active_enrollments'] ?? 0),
+                'completed' => (int)($stats['completed_enrollments'] ?? 0)
             ]
         ]
     ];
     
     // Log profile access
-    app_log('info', sprintf(
-        'Profile accessed - User: %d, Role: %s, Status: %s',
-        $userId,
-        $profile['role'],
-        $profile['status']
-    ));
+    if (function_exists('audit_admin_action')) {
+        audit_admin_action($userId, 'read', 'profile', $userId, 'User accessed own profile');
+    }
     
-    json_ok($profileData, 'Profile retrieved successfully');
+    json_success($profileData, 'Profile retrieved successfully', [
+        'endpoint' => 'profile_me',
+        'user_id' => $userId
+    ]);
     
 } catch (Exception $e) {
-    app_log('error', 'Profile me error: ' . $e->getMessage());
-    json_fail('SERVER_ERROR', 'Failed to retrieve profile');
+    json_error('Failed to retrieve profile: ' . $e->getMessage(), 500);
 }

@@ -6,7 +6,7 @@
  * GET /api/admin/users/search.php?q=john&page=1&limit=20
  */
 
-require_once __DIR__ . '/../../_bootstrap.php';
+require_once __DIR__ . '/../_bootstrap.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');

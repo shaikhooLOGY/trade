@@ -8,7 +8,7 @@
  * Returns all enrollments for the authenticated trader
  */
 
-require_once __DIR__ . '/../../_bootstrap.php';
+require_once __DIR__ . '/../_bootstrap.php';
 
 header('Content-Type: application/json');
 

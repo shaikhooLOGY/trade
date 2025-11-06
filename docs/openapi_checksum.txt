@@ -1,4 +1,1 @@
-SHA256 Checksum: 96dafffb063dc75d9f09c330c360e39ede78ddbcd16fa1e5c765301fa2299347
-Generated: 2025-11-06 17:04:21
-File: docs/openapi.yaml
-Size:    97408 bytes
+5ada934cc795a442a8f6ff6b8b3a2df6502b32119a50bf9b4e626c03e7c247dd

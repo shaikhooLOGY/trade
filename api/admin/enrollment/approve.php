@@ -6,7 +6,7 @@
  * POST /api/admin/enrollment/approve.php
  */
 
-require_once __DIR__ . '/../../_bootstrap.php';
+require_once __DIR__ . '/../_bootstrap.php';
 require_once __DIR__ . '/../../includes/security/ratelimit.php';
 require_once __DIR__ . '/../../includes/logger/audit_log.php';
 

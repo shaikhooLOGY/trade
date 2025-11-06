@@ -2,44 +2,57 @@
 /**
  * api/trades/list.php
  *
- * Trades API - List user trades
+ * Standardized Trades API - List user trades
  * GET /api/trades/list.php
  *
- * Get trade history for the authenticated trader with optional filtering
+ * Get trade history for the authenticated user with optional filtering
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
 
-header('Content-Type: application/json');
+// Handle preflight requests
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header('HTTP/1.1 200 OK');
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, X-Requested-With, X-Idempotency-Key, X-CSRF-Token');
+    exit;
+}
 
 // Only allow GET requests
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    json_fail('INVALID_INPUT', 'Only GET requests are allowed');
+    json_error('Method not allowed', 405);
 }
 
-// Require authentication and active user
-require_active_user_json('Authentication required');
+// Apply rate limiting
+api_rate_limit('trades_list', 30);
 
-// Rate limiting
-if (!rate_limit_api_middleware('trade_list', 10)) {
-    exit; // Rate limit response already sent
-}
+// Require authentication
+require_login_json();
 
 try {
-    // Get trader ID from session
-    $traderId = (int)$_SESSION['user_id'];
+    $userId = (int)$_SESSION['user_id'];
+    global $mysqli;
     
     // Parse query parameters for filtering
     $filters = [];
+    $params = [$userId];
+    $paramTypes = ['i'];
     
+    // Symbol filter
     if (isset($_GET['symbol']) && trim($_GET['symbol']) !== '') {
-        $filters['symbol'] = trim($_GET['symbol']);
+        $filters['symbol'] = '%' . trim($_GET['symbol']) . '%';
+        $params[] = $filters['symbol'];
+        $paramTypes[] = 's';
     }
     
+    // Date range filters
     if (isset($_GET['from']) && trim($_GET['from']) !== '') {
         $dateFrom = DateTime::createFromFormat('Y-m-d', $_GET['from']);
         if ($dateFrom !== false) {
             $filters['from'] = $dateFrom->format('Y-m-d');
+            $params[] = $filters['from'];
+            $paramTypes[] = 's';
         }
     }
     
@@ -47,44 +60,84 @@ try {
         $dateTo = DateTime::createFromFormat('Y-m-d', $_GET['to']);
         if ($dateTo !== false) {
             $filters['to'] = $dateTo->format('Y-m-d');
+            $params[] = $filters['to'];
+            $paramTypes[] = 's';
         }
     }
     
     // Validate pagination parameters
-    $pagination = validate_pagination_params($_GET);
+    $limit = isset($_GET['limit']) && is_numeric($_GET['limit']) ? min(100, max(1, (int)$_GET['limit'])) : 50;
+    $offset = isset($_GET['offset']) && is_numeric($_GET['offset']) ? max(0, (int)$_GET['offset']) : 0;
+    $params[] = $limit;
+    $params[] = $offset;
+    $paramTypes[] = 'i';
+    $paramTypes[] = 'i';
     
-    // Get user trades
-    $trades = get_user_trades($traderId, $filters, $pagination['limit'], $pagination['offset']);
+    // Build WHERE clause
+    $whereConditions = ['user_id = ?', '(deleted_at IS NULL OR deleted_at = "")'];
     
-    // Format response
-    $items = array_map(function($trade) {
-        return [
-            'id' => (int)$trade['id'],
-            'symbol' => $trade['symbol'],
-            'side' => $trade['side'],
-            'quantity' => (float)$trade['quantity'],
-            'price' => (float)$trade['price'],
-            'opened_at' => $trade['opened_at'],
-            'closed_at' => $trade['closed_at'],
-            'notes' => $trade['notes'],
-            'created_at' => $trade['created_at']
+    if (isset($filters['symbol'])) {
+        $whereConditions[] = 'symbol LIKE ?';
+    }
+    
+    if (isset($filters['from'])) {
+        $whereConditions[] = 'DATE(opened_at) >= ?';
+    }
+    
+    if (isset($filters['to'])) {
+        $whereConditions[] = 'DATE(opened_at) <= ?';
+    }
+    
+    $whereClause = implode(' AND ', $whereConditions);
+    
+    // Get trades with filtering
+    $sql = "SELECT * FROM trades WHERE $whereClause ORDER BY opened_at DESC LIMIT ? OFFSET ?";
+    
+    $stmt = $mysqli->prepare($sql);
+    if (!$stmt) {
+        throw new Exception('Failed to prepare trades query');
+    }
+    
+    $stmt->bind_param(implode('', $paramTypes), ...$params);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    $trades = [];
+    while ($row = $result->fetch_assoc()) {
+        $trades[] = [
+            'id' => (int)$row['id'],
+            'symbol' => $row['symbol'],
+            'side' => $row['side'],
+            'quantity' => (float)$row['quantity'],
+            'price' => (float)$row['price'],
+            'opened_at' => $row['opened_at'],
+            'closed_at' => $row['closed_at'],
+            'notes' => $row['notes'],
+            'outcome' => $row['outcome'],
+            'pl_percent' => $row['pl_percent'] ? (float)$row['pl_percent'] : null,
+            'rr' => $row['rr'] ? (float)$row['rr'] : null,
+            'analysis_link' => $row['analysis_link'],
+            'created_at' => $row['created_at']
         ];
-    }, $trades);
+    }
+    $stmt->close();
     
-    $meta = [
+    // Log trades access
+    if (function_exists('audit_admin_action')) {
+        audit_admin_action($userId, 'read', 'trades', null, 'User accessed trades list');
+    }
+    
+    // Return standardized response
+    json_success($trades, 'Trades retrieved successfully', [
+        'endpoint' => 'trades_list',
         'pagination' => [
-            'limit' => $pagination['limit'],
-            'offset' => $pagination['offset'],
+            'limit' => $limit,
+            'offset' => $offset,
             'count' => count($trades)
         ],
         'filters' => $filters
-    ];
-    
-    json_ok($items, 'Trades retrieved successfully', $meta);
+    ]);
     
 } catch (Exception $e) {
-    // Log error
-    app_log('error', 'trade_list_api_error: ' . $e->getMessage());
-    
-    json_fail('SERVER_ERROR', 'Failed to retrieve trades');
+    json_error('Failed to retrieve trades: ' . $e->getMessage(), 500);
 }

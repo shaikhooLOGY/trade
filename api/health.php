@@ -2,42 +2,51 @@
 /**
  * api/health.php
  *
- * Minimal Health Check API - Environment-based health monitoring
+ * Standardized Health Check API
  * GET /api/health.php
  *
- * NOTE: This endpoint returns 200 only when APP_ENV=local; otherwise 404 JSON.
+ * Returns unified JSON envelope with environment and system information
  */
 
 require_once __DIR__ . '/_bootstrap.php';
 
-// Set headers
-header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
-    exit();
+    header('HTTP/1.1 200 OK');
+    header('Access-Control-Allow-Origin: *');
+    header('Access-Control-Allow-Methods: GET, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, X-Requested-With, X-Idempotency-Key, X-CSRF-Token');
+    exit;
 }
 
 // Only allow GET requests
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    json_fail('METHOD_NOT_ALLOWED', 'Only GET method is allowed');
+    json_error('Method not allowed', 405);
 }
 
-// Check environment using getenv()
-$appEnv = getenv('APP_ENV');
+// Apply rate limiting for health check (high limit since it's lightweight)
+api_rate_limit('health', 300);
 
-if ($appEnv !== 'local') {
-    json_fail('FEATURE_OFF', 'Health endpoint available only in local environment');
+try {
+    // Get environment information
+    $env_info = get_env_info();
+    
+    // Return standardized health response
+    json_success([
+        'env' => $env_info['app_env'],
+        'version' => '1.0.0',
+        'db_status' => $env_info['db_connection'],
+        'php_version' => $env_info['php_version'],
+        'system_info' => [
+            'uptime' => null, // Could implement uptime tracking
+            'memory_usage' => memory_get_usage(true),
+            'memory_peak' => memory_get_peak_usage(true)
+        ]
+    ], 'ok', [
+        'endpoint' => 'health',
+        'ts' => $env_info['timestamp']
+    ]);
+    
+} catch (Exception $e) {
+    json_error('Health check failed: ' . $e->getMessage(), 500);
 }
-
-// Return health status for local environment
-http_response_code(200);
-echo json_encode([
-    'status' => 'ok',
-    'app_env' => $appEnv,
-    'time' => date('c')
-]);
