@@ -62,80 +62,255 @@ servers:
   - url: https://api.shaikhoology.com
     description: Production Server
 
-security:
-  - SessionAuth: []
-  - AdminAuth: []
+# === Health Check ===
+/api/health.php:
+  get:
+    tags:
+      - Health
+    summary: Health Check
+    description: |
+      Environment-based health monitoring endpoint.
+      
+      **Returns 200 {success:true} when service is healthy**
+      Available only in local development environment.
+      
+    operationId: healthCheck
+    responses:
+      '200':
+        description: Health status OK
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '404':
+        description: Feature disabled (production environment)
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
 
-paths:
-  # === Health Check ===
-  /api/health.php:
-    get:
-      tags:
-        - Health
-      summary: Health Check
-      description: |
-        Environment-based health monitoring endpoint.
-        
-        **Note**: Returns 200 only when APP_ENV=local; otherwise 404.
-        Available only in local development environment.
-        
-      operationId: healthCheck
-      responses:
-        '200':
-          description: Health status OK (local environment only)
-          content:
-            application/json:
-              schema:
+# === Profile APIs ===
+/api/profile/me.php:
+  get:
+    tags:
+      - Profile
+    summary: Get Current User Profile
+    description: |
+      Retrieves the current user's profile with comprehensive statistics.
+      
+      **Returns 401 when unauthenticated**
+      
+    operationId: getCurrentProfile
+    responses:
+      '200':
+        description: Profile retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+
+# === Admin E2E Status ===
+/api/admin/e2e_status.php:
+  get:
+    tags:
+      - Admin
+    summary: Get E2E Test Status
+    description: |
+      Admin endpoint for viewing E2E test status and results.
+      
+      **Returns 401 when unauthenticated; 200 for admin**
+      
+    operationId: getE2eStatus
+    responses:
+      '200':
+        description: E2E status retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '401':
+        description: Login required
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+
+# === Agent Log APIs ===
+/api/agent/log.php:
+  post:
+    tags:
+      - Agent
+    summary: Record Agent Activity
+    description: |
+      Records an agent activity event for monitoring and tracking.
+      
+      **Security**: Requires active user authentication
+      **Rate Limiting**: 30 requests per minute
+      **CSRF Protection**: 403 on CSRF failure
+      
+    operationId: recordAgentEvent
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - event
+            properties:
+              event:
+                type: string
+                description: Event description
+                example: "user_action"
+              meta:
                 type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    type: object
-                    properties:
-                      status:
-                        type: string
-                        example: "ok"
-                      app_env:
-                        type: string
-                        example: "local"
-                      time:
-                        type: string
-                        format: date-time
-                  message:
-                    type: string
-                    example: "Health check successful"
-                  error:
-                    type: "null"
-        '404':
-          description: Feature disabled (production environment)
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                    example: "Health endpoint available only in local environment"
-                  error:
-                    type: string
-                    example: "FEATURE_OFF"
+                description: Additional event metadata
+                additionalProperties: true
+                nullable: true
+    responses:
+      '200':
+        description: Agent event recorded successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '400':
+        description: Invalid event data
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '403':
+        description: CSRF token missing or invalid
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '429':
+        description: Rate limit exceeded
+        headers:
+          X-RateLimit-Limit:
+            description: Total requests allowed per minute
+            schema:
+              type: integer
+              example: 30
+          X-RateLimit-Remaining:
+            description: Requests remaining in current window
+            schema:
+              type: integer
+              example: 0
+          X-RateLimit-Reset:
+            description: Unix timestamp when rate limit resets
+            schema:
+              type: integer
+              example: 1730889600
+          Retry-After:
+            description: Seconds to wait before retrying
+            schema:
+              type: integer
+              example: 60
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+
+/api/admin/agent/logs.php:
+  get:
+    tags:
+      - Agent
+      - Admin
+    summary: Get Agent Activity Logs
+    description: |
+      Admin endpoint for viewing agent activity logs with filtering and pagination.
+      
+      **Returns 200 for admin; 401 otherwise**
+      **Rate Limiting**: 10 requests per minute
+      
+    operationId: getAgentLogs
+    parameters:
+      - name: user_id
+        in: query
+        description: Filter by user ID
+        schema:
+          type: integer
+      - name: q
+        in: query
+        description: Search in event field
+        schema:
+          type: string
+      - name: limit
+        in: query
+        description: Number of results per page (max 100)
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: offset
+        in: query
+        description: Offset for pagination
+        schema:
+          type: integer
+          minimum: 0
+          default: 0
+    responses:
+      '200':
+        description: Agent logs retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '401':
+        description: Authentication required
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '403':
+        description: Admin access required
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
+      '429':
+        description: Rate limit exceeded
+        headers:
+          X-RateLimit-Limit:
+            description: Total requests allowed per minute
+            schema:
+              type: integer
+              example: 10
+          X-RateLimit-Remaining:
+            description: Requests remaining in current window
+            schema:
+              type: integer
+              example: 0
+          X-RateLimit-Reset:
+            description: Unix timestamp when rate limit resets
+            schema:
+              type: integer
+              example: 1730889600
+          Retry-After:
+            description: Seconds to wait before retrying
+            schema:
+              type: integer
+              example: 60
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApiResponse'
 
   # === Dashboard APIs ===
   /api/dashboard/index.php:
@@ -542,19 +717,19 @@ paths:
                     example: "RATE_LIMITED"
 
   # === MTM (Model Training Management) APIs ===
-  /api/mtm/enroll:
+  /api/mtm/enroll.php:
     post:
       tags:
         - MTM
       summary: Enroll in MTM Model
       description: |
-        Allows authenticated users to enroll in a specific MTM (Model Training Management) model at a specific tier.
+        Allows authenticated users to enroll in a specific MTM (Model Training Management) model.
         
         **Compliance**: Automatically logs enrollment attempts and successes for audit trail.
         
         **Security**:
         - Requires login and active user status
-        - CSRF protection enforced
+        - CSRF protection enforced (403 on CSRF failure)
         - Rate limited: 5 requests per minute
         
       operationId: enrollMtmModel
@@ -566,7 +741,6 @@ paths:
               type: object
               required:
                 - model_id
-                - tier
               properties:
                 model_id:
                   type: integer
@@ -576,7 +750,7 @@ paths:
                 tier:
                   type: string
                   description: Enrollment tier level
-                  enum: [basic, intermediate, advanced]
+                  enum: [basic, premium, professional]
                   example: basic
       responses:
         '200':
@@ -584,95 +758,31 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    type: object
-                    properties:
-                      enrollment_id:
-                        type: integer
-                        description: Unique enrollment ID
-                        example: 456
-                      unlocked_task_id:
-                        type: integer
-                        description: First unlocked task ID in the model
-                        example: 789
-                  message:
-                    type: string
-                    example: "Successfully enrolled in MTM model"
-                  error:
-                    type: "null"
+                $ref: '#/components/schemas/ApiResponse'
         '400':
           description: Validation error
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                  error:
-                    type: string
+                $ref: '#/components/schemas/ApiResponse'
         '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                  error:
-                    type: string
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: CSRF token missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
         '409':
           description: Already enrolled in model
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                  error:
-                    type: string
+                $ref: '#/components/schemas/ApiResponse'
         '429':
           description: Rate limit exceeded
           headers:
@@ -699,24 +809,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                    example: "Rate limit exceeded. Try again later."
-                  error:
-                    type: string
-                    example: "RATE_LIMITED"
+                $ref: '#/components/schemas/ApiResponse'
 
   /api/mtm/enrollments:
     get:
@@ -842,7 +935,7 @@ paths:
                     example: "RATE_LIMITED"
 
   # === Trade APIs ===
-  /api/trades/create:
+  /api/trades/create.php:
     post:
       tags:
         - Trades
@@ -851,6 +944,7 @@ paths:
         Creates a new trade record for the authenticated trader.
         
         **Compliance**: Automatically logs trade creation for financial audit trail.
+        **Security**: CSRF protection enforced (403 on CSRF failure)
         
       operationId: createTrade
       requestBody:
@@ -904,70 +998,25 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    type: object
-                    properties:
-                      id:
-                        type: integer
-                        description: Created trade ID
-                        example: 1001
-                  message:
-                    type: string
-                    example: "Trade created successfully"
-                  error:
-                    type: "null"
+                $ref: '#/components/schemas/ApiResponse'
         '400':
           description: Validation error
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                  error:
-                    type: string
+                $ref: '#/components/schemas/ApiResponse'
         '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                  error:
-                    type: string
+                $ref: '#/components/schemas/ApiResponse'
+        '403':
+          description: CSRF token missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
         '429':
           description: Rate limit exceeded
           headers:
@@ -975,7 +1024,7 @@ paths:
               description: Total requests allowed per minute
               schema:
                 type: integer
-                example: 5
+                example: 30
             X-RateLimit-Remaining:
               description: Requests remaining in current window
               schema:
@@ -994,24 +1043,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                    example: "Rate limit exceeded. Try again later."
-                  error:
-                    type: string
-                    example: "RATE_LIMITED"
+                $ref: '#/components/schemas/ApiResponse'
 
   /api/trades/get.php:
     get:

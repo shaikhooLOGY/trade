@@ -2,110 +2,80 @@
 /**
  * api/agent/log.php
  *
- * Agent Log API - Record agent activity event
+ * Agent Log API - Create new agent log entry
  * POST /api/agent/log.php
  *
- * Records an agent activity event for PM/agent monitoring and tracking.
- * Security: Requires active user authentication
- * Rate Limiting: 30 requests per minute
+ * Creates a new agent log entry with proper authentication, rate limiting, and CSRF protection
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
+require_once __DIR__ . '/../../includes/security/csrf_guard.php';
 
-// Handle preflight requests
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    header('HTTP/1.1 200 OK');
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, X-Requested-With, X-Idempotency-Key, X-CSRF-Token');
-    exit;
-}
+header('Content-Type: application/json');
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_error('Method not allowed', 405);
 }
 
-// Apply rate limiting
-api_rate_limit('agent_log', 30);
+// Require authentication and active user
+require_active_user_json();
 
-// Require authentication
-require_login_json();
+// Rate limiting: 30 per minute for agent logging
+require_rate_limit('agent_log', 30);
 
-// Check CSRF token
-validate_csrf_api();
+// CSRF protection
+require_csrf_json();
 
 try {
-    // Read JSON input
-    $input = json_decode(file_get_contents('php://input'), true);
-    
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        json_error('Invalid JSON input', 400);
-    }
-    
-    // Validate required fields
-    $requiredFields = ['actor', 'source', 'action', 'target', 'summary'];
-    foreach ($requiredFields as $field) {
-        if (empty($input[$field])) {
-            json_error("Missing required field: $field", 400);
-        }
-    }
-    
-    // Validate source values
-    $validSources = ['kilo', 'codex', 'cursor', 'manual'];
-    if (!in_array($input['source'], $validSources, true)) {
-        json_error('Invalid source. Must be one of: ' . implode(', ', $validSources), 400);
-    }
-    
-    $userId = (int)$_SESSION['user_id'];
-    $timestamp = date('Y-m-d H:i:s');
-    
     global $mysqli;
     
-    // Insert agent log event
+    // Read JSON input
+    $input = get_json_input();
+    
+    // Validate required fields
+    if (!isset($input['event']) || empty($input['event'])) {
+        json_error('Invalid input', 'Event field is required', null, 400);
+    }
+    
+    $event = trim($input['event']);
+    $meta = isset($input['meta']) ? $input['meta'] : null;
+    
+    if ($meta !== null && !is_array($meta)) {
+        json_error('Invalid input', 'Meta must be an object', null, 400);
+    }
+    
+    // Get user ID from session
+    $userId = (int)$_SESSION['user_id'];
+    
+    // Insert into agent_logs table using guarded schema
     $stmt = $mysqli->prepare("
-        INSERT INTO agent_logs (user_id, actor, source, action, target, summary, payload, created_at) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO agent_logs (user_id, event, meta_json, created_at)
+        VALUES (?, ?, ?, NOW())
     ");
     
     if (!$stmt) {
-        throw new Exception('Failed to prepare agent log query');
+        throw new Exception('Failed to prepare agent log query: ' . $mysqli->error);
     }
     
-    $payload = $input['payload'] ?? null;
-    $payloadJson = $payload ? json_encode($payload) : null;
+    $metaJson = $meta !== null ? json_encode($meta) : null;
+    $stmt->bind_param('iss', $userId, $event, $metaJson);
     
-    $stmt->bind_param('isssssss', 
-        $userId,
-        $input['actor'],
-        $input['source'], 
-        $input['action'],
-        $input['target'],
-        $input['summary'],
-        $payloadJson,
-        $timestamp
-    );
+    $success = $stmt->execute();
+    if (!$success) {
+        throw new Exception('Failed to execute agent log query: ' . $stmt->error);
+    }
     
-    $stmt->execute();
-    $eventId = $mysqli->insert_id;
+    $logId = $mysqli->insert_id;
     $stmt->close();
     
-    // Log agent activity in audit trail
-    if (function_exists('audit_admin_action')) {
-        audit_admin_action($userId, 'agent_log', 'agent_event', $eventId,
-            sprintf('Agent event recorded: %s from %s', $input['action'], $input['source']));
-    }
-    
+    // Return success response
     json_success([
-        'event_id' => $eventId,
-        'timestamp' => $timestamp
-    ], 'Agent event recorded successfully', [
-        'endpoint' => 'agent_log',
-        'actor' => $input['actor'],
-        'source' => $input['source'],
-        'action' => $input['action']
-    ]);
+        'id' => $logId,
+        'event' => $event,
+        'user_id' => $userId
+    ], 'Agent event logged successfully');
     
 } catch (Exception $e) {
-    json_error('Failed to record agent event: ' . $e->getMessage(), 500);
+    json_error('Agent log error: ' . $e->getMessage(), 500);
 }

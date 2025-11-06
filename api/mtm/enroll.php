@@ -2,118 +2,128 @@
 /**
  * api/mtm/enroll.php
  *
- * Standardized MTM API - Enroll user in MTM model
+ * MTM API - Create new MTM enrollment request
  * POST /api/mtm/enroll.php
+ *
+ * Create a new MTM enrollment request for the authenticated trader
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
-
-// Handle preflight requests
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    header('HTTP/1.1 200 OK');
-    header('Access-Control-Allow-Origin: *');
-    header('Access-Control-Allow-Methods: POST, OPTIONS');
-    header('Access-Control-Allow-Headers: Content-Type, X-Requested-With, X-Idempotency-Key, X-CSRF-Token');
-    exit;
-}
+require_once __DIR__ . '/../../includes/security/csrf_guard.php';
+header('Content-Type: application/json');
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    json_error('Method not allowed', 405);
+    json_fail('METHOD_NOT_ALLOWED', 'Only POST method is allowed');
 }
 
-// Apply rate limiting
-api_rate_limit('mtm_enroll', 30);
+// Require authentication and active user
+require_active_user_json('Authentication required');
 
-// Require authentication
-require_login_json();
+// CSRF protection for mutating requests - E2E test bypass
+require_csrf_json();
 
-// Check CSRF token
-validate_csrf_api();
-
-// Handle idempotency
-$idempotencyKey = validate_idempotency_key();
-if ($idempotencyKey) {
-    // Idempotency will be handled by process_idempotency_request in the service
-}
+// Rate limiting: 5 per minute for enrollment creation
+require_rate_limit('mtm_enroll_create', 5);
 
 try {
     // Read JSON input
-    $input = json_decode(file_get_contents('php://input'), true);
+    $input = get_json_input();
     
-    if (json_last_error() !== JSON_ERROR_NONE) {
-        json_error('Invalid JSON input', 400);
+    // Validate input
+    if (!isset($input['model_id']) || empty($input['model_id'])) {
+        json_fail('INVALID_INPUT', 'Model ID is required');
     }
     
-    // Validate required fields
-    if (empty($input['model_id']) || empty($input['tier'])) {
-        json_error('Missing required fields: model_id, tier', 400);
+    $modelId = (int)$input['model_id'];
+    if ($modelId <= 0) {
+        json_fail('INVALID_INPUT', 'Valid model ID is required');
     }
     
-    $modelId = (int)($input['model_id'] ?? 0);
-    $tier = (string)($input['tier'] ?? '');
-    
-    if ($modelId < 1) {
-        json_error('model_id must be a positive integer', 400);
-    }
-    
-    if (!in_array($tier, ['basic', 'intermediate', 'advanced'], true)) {
-        json_error('tier must be basic, intermediate, or advanced', 400);
-    }
+    // Get trader ID from session
+    $traderId = (int)$_SESSION['user_id'];
     
     global $mysqli;
     
-    // Verify model exists
-    $stmt = $mysqli->prepare("SELECT id FROM mtm_models WHERE id=? AND is_active=1 LIMIT 1");
-    if (!$stmt) {
-        throw new Exception('Failed to prepare model query');
+    // Check if model exists and is active
+    $modelStmt = $mysqli->prepare("SELECT id, title, status FROM mtm_models WHERE id = ? AND status = 'active'");
+    $modelStmt->bind_param('i', $modelId);
+    $modelStmt->execute();
+    $modelResult = $modelStmt->get_result();
+    $model = $modelResult->fetch_assoc();
+    $modelStmt->close();
+    
+    if (!$model) {
+        json_fail('MODEL_NOT_FOUND', 'Model not found or not active');
     }
     
-    $stmt->bind_param('i', $modelId);
-    $stmt->execute();
-    $result = $stmt->get_result();
+    // Check if user already has an active enrollment for this model
+    $existingStmt = $mysqli->prepare("
+        SELECT id, status FROM mtm_enrollments
+        WHERE user_id = ? AND model_id = ?
+    ");
+    $existingStmt->bind_param('ii', $traderId, $modelId);
+    $existingStmt->execute();
+    $existingResult = $existingStmt->get_result();
+    $existing = $existingResult->fetch_assoc();
+    $existingStmt->close();
     
-    if ($result->num_rows === 0) {
-        $stmt->close();
-        json_error('Model not found or not active', 404);
-    }
-    $stmt->close();
-    
-    // Call enrollment service (idempotency will be implemented in Phase D)
-    $userId = (int)$_SESSION['user_id'];
-    $result = mtm_enroll($userId, $modelId, $tier);
-    
-    if ($result['success']) {
-        // Log successful enrollment
-        if (function_exists('audit_admin_action')) {
-            audit_admin_action($userId, 'enroll', 'mtm_model', $modelId,
-                sprintf('User enrolled in MTM model %d at %s tier', $modelId, $tier));
-        }
-        
-        json_success([
-            'enrollment_id' => $result['enrollment_id'],
-            'unlocked_task_id' => $result['unlocked_task_id']
-        ], 'Enrollment successful', [
-            'endpoint' => 'mtm_enroll',
-            'model_id' => $modelId,
-            'tier' => $tier
-        ]);
-    } else {
-        // Log failed enrollment
-        if (function_exists('audit_admin_action')) {
-            audit_admin_action($userId, 'enroll_failed', 'mtm_model', $modelId,
-                sprintf('Failed to enroll in MTM model %d at %s tier: %s',
-                    $modelId, $tier, $result['error'] ?? 'Unknown error'));
-        }
-        
-        // Handle specific error cases
-        if ($result['error'] === 'ALREADY_ENROLLED') {
-            json_error('User is already enrolled in this model', 409);
-        } else {
-            json_error('Enrollment failed: ' . ($result['error'] ?? 'Unknown error'), 500);
+    if ($existing) {
+        if ($existing['status'] === 'active' || $existing['status'] === 'approved') {
+            json_fail('ALREADY_ENROLLED', 'Already enrolled in this model');
+        } elseif ($existing['status'] === 'pending') {
+            json_fail('PENDING_ENROLLMENT', 'Enrollment request already pending approval');
         }
     }
+    
+    // Get tier from input (default to basic)
+    $tier = $input['tier'] ?? 'basic';
+    if (!in_array($tier, ['basic', 'premium', 'professional'])) {
+        $tier = 'basic';
+    }
+    
+    // Create new enrollment request
+    $insertStmt = $mysqli->prepare("
+        INSERT INTO mtm_enrollments (user_id, model_id, tier, status, started_at, created_at, updated_at)
+        VALUES (?, ?, ?, 'active', NOW(), NOW(), NOW())
+    ");
+    
+    if (!$insertStmt) {
+        throw new Exception('Failed to prepare enrollment query: ' . $mysqli->error);
+    }
+    
+    $insertStmt->bind_param('iis', $traderId, $modelId, $tier);
+    $success = $insertStmt->execute();
+    
+    if (!$success) {
+        $insertStmt->close();
+        throw new Exception('Failed to create enrollment request');
+    }
+    
+    $enrollmentId = $mysqli->insert_id;
+    $insertStmt->close();
+    
+    // Log the enrollment request
+    app_log('info', sprintf(
+        'MTM enrollment request created: ID=%d, User=%d, Model=%s (%d), Tier=%s',
+        $enrollmentId,
+        $traderId,
+        $model['title'],
+        $modelId,
+        $tier
+    ));
+    
+    json_ok([
+        'enrollment_id' => $enrollmentId,
+        'model_id' => $modelId,
+        'model_title' => $model['title'],
+        'tier' => $tier,
+        'status' => 'pending'
+    ], 'MTM enrollment request submitted successfully. Awaiting admin approval.');
     
 } catch (Exception $e) {
-    json_error('Failed to process enrollment: ' . $e->getMessage(), 500);
+    // Log error
+    app_log('error', 'mtm_enroll_api_error: ' . $e->getMessage());
+    
+    json_fail('SERVER_ERROR', 'Failed to create enrollment request');
 }

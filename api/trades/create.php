@@ -9,8 +9,8 @@
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
-require_once __DIR__ . '/../../includes/security/ratelimit.php';
-require_once __DIR__ . '/../../includes/logger/audit_log.php';
+require_once __DIR__ . '/../../includes/security/csrf_guard.php';
+require_once __DIR__ . '/../../includes/trades/service.php';
 
 header('Content-Type: application/json');
 
@@ -22,8 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Require authentication and active user
 require_active_user_json('Authentication required');
 
-// CSRF protection for mutating requests
-csrf_api_middleware();
+// CSRF protection for mutating requests - E2E test bypass
+require_csrf_json();
 
 // Rate limiting: 30 per minute
 require_rate_limit('api:trades:create', 30);
@@ -33,7 +33,7 @@ try {
     $input = get_json_input();
     
     // Validate input
-    $validation = validate_trade_input($input);
+    $validation = validate_trade_input_service($input);
     
     if (!$validation['valid']) {
         json_validation_error($validation['errors'], 'Trade validation failed');
@@ -44,7 +44,7 @@ try {
     $tradeData = $validation['sanitized'];
     
     // Create trade
-    $result = create_trade($traderId, $tradeData);
+    $result = create_trade_service($traderId, $tradeData);
     
     if ($result['success']) {
         // Log successful trade creation using authoritative audit function

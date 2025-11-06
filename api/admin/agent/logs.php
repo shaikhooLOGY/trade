@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 // Apply rate limiting (stricter for admin endpoint)
-api_rate_limit('admin_agent_logs', 10);
+require_rate_limit('admin_agent_logs', 10);
 
 // Require admin authentication
 require_admin_json();
@@ -41,74 +41,57 @@ try {
     $paramTypes = [];
     $whereConditions = ['1=1']; // Always true base condition
     
-    // Actor filter
-    if (isset($_GET['actor']) && trim($_GET['actor']) !== '') {
-        $filters['actor'] = trim($_GET['actor']);
-        $whereConditions[] = 'actor LIKE ?';
-        $params[] = '%' . $filters['actor'] . '%';
-        $paramTypes[] = 's';
+    // User ID filter
+    if (isset($_GET['user_id']) && trim($_GET['user_id']) !== '') {
+        $userIdFilter = (int)$_GET['user_id'];
+        $filters['user_id'] = $userIdFilter;
+        $whereConditions[] = 'user_id = ?';
+        $params[] = $userIdFilter;
+        $paramTypes[] = 'i';
     }
     
-    // Source filter
-    if (isset($_GET['source']) && trim($_GET['source']) !== '') {
-        $filters['source'] = trim($_GET['source']);
-        if (!in_array($filters['source'], ['kilo', 'codex', 'cursor', 'manual'], true)) {
-            json_error('Invalid source filter. Must be: kilo, codex, cursor, or manual', 400);
-        }
-        $whereConditions[] = 'source = ?';
-        $params[] = $filters['source'];
-        $paramTypes[] = 's';
-    }
-    
-    // Action filter
-    if (isset($_GET['action']) && trim($_GET['action']) !== '') {
-        $filters['action'] = trim($_GET['action']);
-        $whereConditions[] = 'action LIKE ?';
-        $params[] = '%' . $filters['action'] . '%';
-        $paramTypes[] = 's';
-    }
-    
-    // Date range filters
-    if (isset($_GET['date_from']) && trim($_GET['date_from']) !== '') {
-        $dateFrom = DateTime::createFromFormat('Y-m-d', $_GET['date_from']);
-        if ($dateFrom === false) {
-            json_error('Invalid date_from format. Use YYYY-MM-DD', 400);
-        }
-        $filters['date_from'] = $dateFrom->format('Y-m-d');
-        $whereConditions[] = 'DATE(created_at) >= ?';
-        $params[] = $filters['date_from'];
-        $paramTypes[] = 's';
-    }
-    
-    if (isset($_GET['date_to']) && trim($_GET['date_to']) !== '') {
-        $dateTo = DateTime::createFromFormat('Y-m-d', $_GET['date_to']);
-        if ($dateTo === false) {
-            json_error('Invalid date_to format. Use YYYY-MM-DD', 400);
-        }
-        $filters['date_to'] = $dateTo->format('Y-m-d');
-        $whereConditions[] = 'DATE(created_at) <= ?';
-        $params[] = $filters['date_to'];
+    // Event filter (search in event field)
+    if (isset($_GET['q']) && trim($_GET['q']) !== '') {
+        $eventQuery = trim($_GET['q']);
+        $filters['q'] = $eventQuery;
+        $whereConditions[] = 'event LIKE ?';
+        $params[] = '%' . $eventQuery . '%';
         $paramTypes[] = 's';
     }
     
     // Pagination
-    $limit = isset($_GET['limit']) && is_numeric($_GET['limit']) 
+    $limit = isset($_GET['limit']) && is_numeric($_GET['limit'])
         ? min(100, max(1, (int)$_GET['limit'])) : 50;
     $params[] = $limit;
     $paramTypes[] = 'i';
     
-    // Cursor for pagination (last ID from previous page)
-    $cursor = isset($_GET['cursor']) ? (int)$_GET['cursor'] : 0;
-    if ($cursor > 0) {
-        $whereConditions[] = 'id < ?';
-        $params[] = $cursor;
-        $paramTypes[] = 'i';
-    }
+    // Offset for pagination
+    $offset = isset($_GET['offset']) && is_numeric($_GET['offset'])
+        ? max(0, (int)$_GET['offset']) : 0;
+    $params[] = $offset;
+    $paramTypes[] = 'i';
     
     $whereClause = implode(' AND ', $whereConditions);
     
+    // Get total count for pagination info
+    $countSql = "SELECT COUNT(*) as total FROM agent_logs WHERE $whereClause";
+    $countStmt = $mysqli->prepare($countSql);
+    if (!$countStmt) {
+        throw new Exception('Failed to prepare agent logs count query');
+    }
+    
+    if (!empty($params) && count($params) > 2) { // Remove limit and offset for count
+        $countParams = array_slice($params, 0, -2);
+        $countParamTypes = array_slice($paramTypes, 0, -2);
+        $countStmt->bind_param(implode('', $countParamTypes), ...$countParams);
+    }
+    $countStmt->execute();
+    $countResult = $countStmt->get_result();
+    $totalCount = $countResult->fetch_assoc()['total'];
+    $countStmt->close();
+    
     // Get agent logs with filtering and pagination
-    $sql = "SELECT * FROM agent_logs WHERE $whereClause ORDER BY id DESC LIMIT ?";
+    $sql = "SELECT * FROM agent_logs WHERE $whereClause ORDER BY id DESC LIMIT ? OFFSET ?";
     
     $stmt = $mysqli->prepare($sql);
     if (!$stmt) {
@@ -119,50 +102,31 @@ try {
     $stmt->execute();
     $result = $stmt->get_result();
     
-    $events = [];
-    $lastId = 0;
+    $items = [];
     while ($row = $result->fetch_assoc()) {
-        $events[] = [
+        $items[] = [
             'id' => (int)$row['id'],
-            'timestamp' => $row['created_at'],
-            'actor' => $row['actor'],
-            'source' => $row['source'],
-            'action' => $row['action'],
-            'target' => $row['target'],
-            'summary' => $row['summary'],
-            'payload' => $row['payload'] ? json_decode($row['payload'], true) : null,
-            'user_id' => (int)$row['user_id']
+            'user_id' => (int)$row['user_id'],
+            'event' => $row['event'],
+            'meta' => $row['meta_json'] ? json_decode($row['meta_json'], true) : null,
+            'created_at' => $row['created_at']
         ];
-        $lastId = (int)$row['id'];
     }
     $stmt->close();
-    
-    // Get next cursor for pagination
-    $nextCursor = null;
-    if (count($events) === $limit) {
-        $nextCursor = $lastId;
-    }
     
     // Log admin access to agent logs
     $adminId = (int)$_SESSION['user_id'];
     if (function_exists('audit_admin_action')) {
-        audit_admin_action($adminId, 'read', 'agent_logs', null, 
-            'Admin accessed agent activity logs with filters: ' . json_encode($filters));
+        audit_admin_action($adminId, 'read', 'agent_logs', null,
+            'Admin accessed agent logs with filters: ' . json_encode($filters));
     }
     
     json_success([
-        'events' => $events,
-        'next_cursor' => $nextCursor,
-        'filters_applied' => $filters,
-        'pagination' => [
-            'limit' => $limit,
-            'count' => count($events),
-            'has_more' => $nextCursor !== null
-        ]
-    ], 'Agent logs retrieved successfully', [
-        'endpoint' => 'admin_agent_logs',
-        'filters_count' => count($filters)
-    ]);
+        'items' => $items,
+        'total' => (int)$totalCount,
+        'limit' => $limit,
+        'offset' => $offset
+    ], 'Agent logs retrieved successfully');
     
 } catch (Exception $e) {
     json_error('Failed to retrieve agent logs: ' . $e->getMessage(), 500);
