@@ -91,11 +91,14 @@ include __DIR__ . '/../header.php';
   .topbar{ text-align:center;padding:30px 20px;background:rgba(0,0,0,0.3);margin-bottom:30px}
   .topbar h1{ margin:0; font-size:28px;
     background:linear-gradient(90deg,#ff6b6b,#4ecdc4,#45b7d1);
-    -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+    -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:transparent;
   }
   .muted{color:#adb5bd;font-size:13px}
   .card{
-    background:rgba(255,255,255,0.08); backdrop-filter:blur(10px);
+    background:rgba(255,255,255,0.08);
+    -webkit-backdrop-filter:blur(10px);
+    backdrop-filter:blur(10px);
     border:1px solid rgba(255,255,255,0.1);
     border-radius:16px; padding:18px; margin-bottom:20px;
   }

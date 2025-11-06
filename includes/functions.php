@@ -46,14 +46,8 @@ if (!function_exists('flash_get')) {
 
 /* --------------------------------
    CSRF helpers (bootstrap.php provides csrf_field, csrf_verify)
+   Now handled by includes/security/csrf.php which provides csrf_token()
 ----------------------------------- */
-if (!function_exists('csrf_token')) {
-    function csrf_token(): string {
-        // Use unified CSRF token handler
-        require_once __DIR__ . '/security/csrf_unify.php';
-        return get_csrf_token();
-    }
-}
 
 /* --------------------------------
    Validators

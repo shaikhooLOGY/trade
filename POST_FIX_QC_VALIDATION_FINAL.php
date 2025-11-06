@@ -139,10 +139,7 @@ try {
     require_once 'includes/logger/audit_log.php';
     
     // Test audit logging
-    $test_event_id = log_audit_event('qc_validation', 'system_test', 'QC Post-Fix validation test', [
-        'test_type' => 'post_fix_validation',
-        'timestamp' => date('c')
-    ]);
+    $test_event_id = log_audit_event(null, 'system_test', 'system', null, 'QC Post-Fix validation test');
     
     if ($test_event_id) {
         echo "✅ Audit logging: FUNCTIONAL (Event ID: $test_event_id)\n";

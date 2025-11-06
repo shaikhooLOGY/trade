@@ -14,8 +14,13 @@ echo "1. CHECKING AUDIT_EVENTS TABLE SCHEMA:\n";
 $result = $mysqli->query("SHOW CREATE TABLE audit_events");
 if ($result) {
     $row = $result->fetch_assoc();
-    echo "AUDIT_EVENTS TABLE SCHEMA:\n";
-    echo $row['Create Table'] . "\n\n";
+    if (is_array($row) && isset($row['Create Table'])) {
+        echo "AUDIT_EVENTS TABLE SCHEMA:\n";
+        echo $row['Create Table'] . "\n\n";
+    } else {
+        echo "ERROR: audit_events table schema query failed\n\n";
+    }
+    $result->free();
 } else {
     echo "ERROR: audit_events table does not exist\n\n";
 }
@@ -46,13 +51,10 @@ try {
     if (function_exists('log_audit_event')) {
         echo "✓ Audit logging function exists\n";
         
-        // Test with a simple event
-        $event_id = log_audit_event('qc_test', 'system_event', 'QC test event from audit sanity check', [
-            'metadata' => ['test' => 'audit_sanity_qc'],
-            'severity' => 'low'
-        ]);
+        // Test with a simple event - passing null for metadata to match signature
+        $event_id = log_audit_event('qc_test', 'system_event', 'QC test event from audit sanity check', null);
         
-        if ($event_id) {
+        if ($event_id !== null && $event_id !== false) {
             echo "✓ SUCCESS: Test audit event logged with ID: $event_id\n\n";
         } else {
             echo "✗ FAILED: Audit event logging failed\n\n";

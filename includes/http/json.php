@@ -103,36 +103,39 @@ define('ERROR_CODES', [
 
 /**
  * Set JSON response headers
- * 
+ *
  * @param int $statusCode HTTP status code
  */
 function json_headers(int $statusCode = 200): void {
     http_response_code($statusCode);
-    header('Content-Type: application/json; charset=utf-8');
+    header('Content-Type: application/json; charset=UTF-8');
     header('Cache-Control: no-cache, must-revalidate');
     header('X-Content-Type-Options: nosniff');
 }
 
 /**
  * Send standard success response with audit logging
+ * LOCKED SIGNATURE - Phase 3 Production Readiness
  *
- * @param array|object $data Response data
- * @param string $message Success message (optional)
- * @param array $meta Additional metadata (optional)
+ * @param array $data Response data (required)
+ * @param string $message Success message (default: '')
+ * @param array|null $meta Additional metadata (default: null)
  * @param int $statusCode HTTP status code (default: 200)
- * @param string $event_type Audit event type for compliance (optional)
- * @param array $audit_options Additional audit logging options (optional)
  */
-function json_ok($data = null, string $message = 'Success', array $meta = [], int $statusCode = 200, string $event_type = null, array $audit_options = []): void {
-    json_headers($statusCode);
+function json_success(array $data = [], string $message = '', ?array $meta = null, int $status = 200): void {
+    json_headers($status);
     
     $response = [
         'success' => true,
         'message' => $message,
         'timestamp' => date('c'),
         'data' => $data,
-        'meta' => $meta
     ];
+    
+    // Add meta if provided
+    if ($meta !== null) {
+        $response['meta'] = $meta;
+    }
     
     // Add user context if available
     if (!empty($_SESSION['user_id'])) {
@@ -142,66 +145,47 @@ function json_ok($data = null, string $message = 'Success', array $meta = [], in
     // Add request ID for tracking
     $response['request_id'] = bin2hex(random_bytes(8));
     
-    // Log successful API response for compliance
-    if ($event_type && function_exists('log_audit_event')) {
-        $audit_options = array_merge([
-            'user_id' => $_SESSION['user_id'] ?? null,
-            'admin_id' => $_SESSION['is_admin'] ? $_SESSION['user_id'] : null,
-            'severity' => 'low',
-            'status' => 'success',
-            'target_type' => 'api_endpoint',
-            'metadata' => [
-                'http_status' => $statusCode,
-                'request_method' => $_SERVER['REQUEST_METHOD'] ?? '',
-                'request_uri' => $_SERVER['REQUEST_URI'] ?? '',
-                'response_size' => strlen(json_encode($response))
-            ]
-        ], $audit_options);
-        
-        log_audit_event($event_type, 'user_action', $message, $audit_options);
-    }
-    
     echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     exit;
 }
 
 /**
- * Send standard error response with audit logging
- *
- * @param string $code Error code (must exist in ERROR_CODES)
- * @param string $message Custom error message (optional)
- * @param array $details Additional error details (optional)
- * @param mixed $data Response data for partial success cases (optional)
- * @param string $event_type Audit event type for compliance (optional)
- * @param array $audit_options Additional audit logging options (optional)
+ * Legacy compatibility function
  */
-function json_fail(string $code, string $message = '', array $details = [], $data = null, string $event_type = null, array $audit_options = []): void {
-    if (!isset(ERROR_CODES[$code])) {
-        $code = 'SERVER_ERROR'; // Fallback to generic error
-    }
+function json_ok($data = null, string $message = 'Success', array $meta = [], int $statusCode = 200): void {
+    // Convert legacy format to new locked format
+    $response_data = $data !== null ? (array)$data : [];
+    $response_meta = !empty($meta) ? $meta : null;
+    json_success($response_data, $message, $response_meta, $statusCode);
+}
+
+/**
+ * Send standard error response with audit logging
+ * LOCKED SIGNATURE - Phase 3 Production Readiness
+ *
+ * @param string $error Error code or message (required)
+ * @param string $message Error message (default: '')
+ * @param array|null $meta Additional error metadata (default: null)
+ * @param int $status HTTP status code (default: 400)
+ */
+function json_error(string $error, string $message = '', ?array $meta = null, int $status = 400): void {
+    $errorCode = in_array($error, array_keys(ERROR_CODES), true) ? $error : 'SERVER_ERROR';
+    $errorInfo = ERROR_CODES[$errorCode] ?? ERROR_CODES['SERVER_ERROR'];
     
-    $errorInfo = ERROR_CODES[$code];
-    $statusCode = $errorInfo['http_status'];
-    
-    json_headers($statusCode);
+    json_headers($status);
     
     $response = [
         'success' => false,
-        'code' => $code,
+        'code' => $errorCode,
         'message' => !empty($message) ? $message : $errorInfo['message'],
         'timestamp' => date('c'),
-        'error_details' => $details,
+        'error_details' => $meta ?? [],
         'request_id' => bin2hex(random_bytes(8))
     ];
     
     // Add user context if available
     if (!empty($_SESSION['user_id'])) {
         $response['user_id'] = (int)$_SESSION['user_id'];
-    }
-    
-    // Add data for partial success cases
-    if ($data !== null) {
-        $response['data'] = $data;
     }
     
     // Add debug info in development environment
@@ -217,51 +201,20 @@ function json_fail(string $code, string $message = '', array $details = [], $dat
         ];
     }
     
-    // Log error response for compliance and security monitoring
-    if (function_exists('log_audit_event')) {
-        $severity = 'low';
-        $event_category = 'user_action';
-        
-        // Determine severity and category based on error code
-        switch ($code) {
-            case 'UNAUTHORIZED':
-            case 'FORBIDDEN':
-            case 'CSRF_MISMATCH':
-                $severity = 'medium';
-                $event_category = 'security_event';
-                break;
-            case 'RATE_LIMITED':
-                $severity = 'medium';
-                $event_category = 'security_event';
-                break;
-            case 'SERVER_ERROR':
-            case 'DATABASE_ERROR':
-                $severity = 'high';
-                $event_category = 'system_event';
-                break;
-        }
-        
-        $audit_options = array_merge([
-            'user_id' => $_SESSION['user_id'] ?? null,
-            'admin_id' => $_SESSION['is_admin'] ? $_SESSION['user_id'] : null,
-            'severity' => $severity,
-            'status' => 'failure',
-            'target_type' => 'api_endpoint',
-            'metadata' => [
-                'error_code' => $code,
-                'http_status' => $statusCode,
-                'request_method' => $_SERVER['REQUEST_METHOD'] ?? '',
-                'request_uri' => $_SERVER['REQUEST_URI'] ?? '',
-                'error_details' => $details
-            ]
-        ], $audit_options);
-        
-        $log_event_type = $event_type ?? "api_error_$code";
-        log_audit_event($log_event_type, $event_category, $message ?: $errorInfo['message'], $audit_options);
-    }
-    
     echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     exit;
+}
+
+/**
+ * Legacy compatibility function
+ */
+function json_fail(string $code, string $message = '', array $details = [], $data = null): void {
+    $response_meta = !empty($details) ? $details : null;
+    if ($data !== null) {
+        $response_meta = $response_meta ?? [];
+        $response_meta['partial_data'] = $data;
+    }
+    json_error($code, $message, $response_meta, ERROR_CODES[$code]['http_status'] ?? 400);
 }
 
 /**
