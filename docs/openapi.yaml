@@ -230,6 +230,27 @@ paths:
                     type: string
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              description: Total requests allowed per minute
+              schema:
+                type: integer
+                example: 5
+            X-RateLimit-Remaining:
+              description: Requests remaining in current window
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+                example: 1730889600
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                example: 60
           content:
             application/json:
               schema:
@@ -330,6 +351,27 @@ paths:
                     type: string
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              description: Total requests allowed per minute
+              schema:
+                type: integer
+                example: 5
+            X-RateLimit-Remaining:
+              description: Requests remaining in current window
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+                example: 1730889600
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                example: 60
           content:
             application/json:
               schema:
@@ -460,6 +502,27 @@ paths:
                     type: string
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              description: Total requests allowed per minute
+              schema:
+                type: integer
+                example: 5
+            X-RateLimit-Remaining:
+              description: Requests remaining in current window
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+                example: 1730889600
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                example: 60
           content:
             application/json:
               schema:
@@ -493,7 +556,7 @@ paths:
         
         **Compliance**: Automatically logs enrollment attempts and successes for audit trail.
         
-        **Security**: 
+        **Security**:
         - Requires login and active user status
         - CSRF protection enforced
         - Rate limited: 5 requests per minute
@@ -616,6 +679,27 @@ paths:
                     type: string
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              description: Total requests allowed per minute
+              schema:
+                type: integer
+                example: 5
+            X-RateLimit-Remaining:
+              description: Requests remaining in current window
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+                example: 1730889600
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                example: 60
           content:
             application/json:
               schema:
@@ -718,6 +802,27 @@ paths:
                     type: string
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              description: Total requests allowed per minute
+              schema:
+                type: integer
+                example: 5
+            X-RateLimit-Remaining:
+              description: Requests remaining in current window
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+                example: 1730889600
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                example: 60
           content:
             application/json:
               schema:
@@ -869,6 +974,27 @@ paths:
                     type: string
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              description: Total requests allowed per minute
+              schema:
+                type: integer
+                example: 5
+            X-RateLimit-Remaining:
+              description: Requests remaining in current window
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+                example: 1730889600
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                example: 60
           content:
             application/json:
               schema:
@@ -1019,6 +1145,27 @@ paths:
                     type: string
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              description: Total requests allowed per minute
+              schema:
+                type: integer
+                example: 5
+            X-RateLimit-Remaining:
+              description: Requests remaining in current window
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+                example: 1730889600
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                example: 60
           content:
             application/json:
               schema:
@@ -1154,6 +1301,27 @@ paths:
                     type: string
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              description: Total requests allowed per minute
+              schema:
+                type: integer
+                example: 5
+            X-RateLimit-Remaining:
+              description: Requests remaining in current window
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+                example: 1730889600
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                example: 60
           content:
             application/json:
               schema:
@@ -1456,6 +1624,27 @@ paths:
                     type: string
         '429':
           description: Rate limit exceeded
+          headers:
+            X-RateLimit-Limit:
+              description: Total requests allowed per minute
+              schema:
+                type: integer
+                example: 5
+            X-RateLimit-Remaining:
+              description: Requests remaining in current window
+              schema:
+                type: integer
+                example: 0
+            X-RateLimit-Reset:
+              description: Unix timestamp when rate limit resets
+              schema:
+                type: integer
+                example: 1730889600
+            Retry-After:
+              description: Seconds to wait before retrying
+              schema:
+                type: integer
+                example: 60
           content:
             application/json:
               schema:

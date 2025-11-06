@@ -261,12 +261,110 @@ run_test "Wrong Method" "PUT" "/api/dashboard/metrics.php" "405"
 run_test "Missing Fields" "POST" "/api/trades/create.php" "401"
 
 # =====================================================
-# PHASE 8: PERFONSE TESTS (OPTIONAL)
+# PHASE 8: RATE LIMITING TESTS (DB-BACKED)
 # =====================================================
 
-log_info "PHASE 8: Performance Tests"
+log_info "PHASE 8: Database-Backed Rate Limiting Tests"
 
-# Test 27: Response time check (basic endpoint)
+# Test 27: Rate Limit Testing Function
+test_rate_limit() {
+    local test_name="$1"
+    local endpoint="$2"
+    local method="${3:-GET}"
+    local data="$4"
+    local cookie_jar="/tmp/ratelimit_test_$(date +%s).jar"
+    
+    log_info "Testing rate limits for: $test_name"
+    
+    local status_200=0
+    local status_429=0
+    local other_status=0
+    
+    # Make 12 rapid requests to simulate same actor
+    for i in {1..12}; do
+        local curl_cmd="curl -s -w '\n%{http_code}' -b '$cookie_jar' -c '$cookie_jar'"
+        
+        # Add CSRF token if needed for POST requests
+        if [ "$method" = "POST" ]; then
+            curl_cmd="$curl_cmd -H 'Content-Type: application/json'"
+            if [ -n "$data" ]; then
+                curl_cmd="$curl_cmd -d '$data'"
+            fi
+        fi
+        
+        curl_cmd="$curl_cmd -X $method '${BASE_URL}${endpoint}'"
+        
+        # Execute request and capture response
+        response=$(eval $curl_cmd)
+        status_code=$(echo "$response" | tail -n 1)
+        
+        case "$status_code" in
+            "200")
+                ((status_200++))
+                ;;
+            "429")
+                ((status_429++))
+                ;;
+            *)
+                ((other_status++))
+                ;;
+        esac
+        
+        # Small delay between requests to avoid overwhelming
+        sleep 0.1
+    done
+    
+    # Cleanup cookie jar
+    rm -f "$cookie_jar"
+    
+    # Check for rate limiting effectiveness
+    if [ $status_429 -gt 0 ]; then
+        log_success "$test_name - Rate Limit Test: 200=$status_200, 429=$status_429, Other=$other_status"
+        echo "  ✓ Rate limiting detected ($status_429 requests blocked)"
+        echo "  ✓ Headers check: Looking for X-RateLimit-* and Retry-After"
+        
+        # Test for rate limit headers (last request)
+        header_test=$(curl -s -I -b "$cookie_jar" -c "$cookie_jar" "${BASE_URL}${endpoint}" 2>/dev/null || echo "")
+        if echo "$header_test" | grep -q "X-RateLimit"; then
+            echo "  ✓ X-RateLimit headers present"
+        fi
+        if echo "$header_test" | grep -q "Retry-After"; then
+            echo "  ✓ Retry-After header present"
+        fi
+        
+        return 0
+    else
+        log_warning "$test_name - Rate Limit Test: 200=$status_200, 429=$status_429, Other=$other_status"
+        echo "  ⚠ No rate limiting detected (all requests returned $status_200)"
+        return 1
+    fi
+}
+
+# Test 28: Login endpoint rate limiting
+test_rate_limit "Login Endpoint" "/login.php" "POST" '{"email":"test@example.com","password":"test"}'
+
+# Test 29: Register endpoint rate limiting
+test_rate_limit "Register Endpoint" "/register.php" "POST" '{"name":"Test User","email":"test@example.com","password":"testpass"}'
+
+# Test 30: Resend verification rate limiting
+test_rate_limit "Resend Verification" "/resend_verification.php" "POST" '{"email":"test@example.com"}'
+
+# Test 31: Trade creation rate limiting
+test_rate_limit "Trade Creation" "/api/trades/create.php" "POST" '{"symbol":"AAPL","side":"buy","quantity":100,"price":150.25,"opened_at":"2025-11-06T10:30:00Z"}'
+
+# Test 32: MTM enrollment rate limiting
+test_rate_limit "MTM Enrollment" "/api/mtm/enroll.php" "POST" '{"model_id":1,"tier":"basic"}'
+
+# Test 33: Admin enrollment approval rate limiting
+test_rate_limit "Admin Enrollment Approve" "/api/admin/enrollment/approve.php" "POST" '{"enrollment_id":1}'
+
+# =====================================================
+# PHASE 9: PERFORMANCE TESTS (OPTIONAL)
+# =====================================================
+
+log_info "PHASE 9: Performance Tests"
+
+# Test 34: Response time check (basic endpoint)
 start_time=$(date +%s.%N)
 curl -s "$BASE_URL/" > /dev/null
 end_time=$(date +%s.%N)
