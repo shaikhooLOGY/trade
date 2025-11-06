@@ -24,18 +24,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Only allow GET requests
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-    http_response_code(404);
-    echo json_encode(['error' => 'Not Found']);
-    exit();
+    json_fail('METHOD_NOT_ALLOWED', 'Only GET method is allowed');
 }
 
 // Check environment using getenv()
 $appEnv = getenv('APP_ENV');
 
 if ($appEnv !== 'local') {
-    http_response_code(404);
-    echo json_encode(['error' => 'Not Found']);
-    exit();
+    json_fail('FEATURE_OFF', 'Health endpoint available only in local environment');
 }
 
 // Return health status for local environment

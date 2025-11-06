@@ -1,16 +1,34 @@
 <?php
 /**
  * includes/http/json.php
- * 
- * Standard JSON response contract for PHP trading platform APIs
- * 
+ *
+ * Enterprise JSON Response System for Shaikhoology TMS-MTM Platform
+ * Phase 3 Compliance Implementation
+ *
  * Provides:
- * - json_ok($data, $message) - Standard success response
- * - json_fail($code, $message, $details) - Standard error response
- * - Standard error codes: CSRF_MISMATCH, VALIDATION_ERROR, NOT_FOUND, ALREADY_EXISTS, UNAUTHORIZED, FORBIDDEN, RATE_LIMITED, SERVER_ERROR
- * - Auth guards integration (require_login, require_admin)
- * - Response formatting with timestamp and metadata
+ * - json_ok($data, $message) - Standard success response with audit logging
+ * - json_fail($code, $message, $details) - Standard error response with audit logging
+ * - Standard error codes with compliance tracking
+ * - Auth guards integration with security event logging
+ * - Response formatting with audit trail integration
+ * - Request/response auditing for compliance reporting
+ *
+ * @version 2.0.0
+ * @created 2025-11-06
+ * @author Shaikhoology Platform Team
  */
+
+// Load audit logging system
+require_once __DIR__ . '/../logger/audit_log.php';
+
+if (!defined('JSON_HTTP_INITIALIZED')) {
+    define('JSON_HTTP_INITIALIZED', true);
+    
+    // Initialize audit logging for API requests
+    if (function_exists('initialize_audit_logging')) {
+        initialize_audit_logging();
+    }
+}
 
 /**
  * Standard error codes for API responses
@@ -96,14 +114,16 @@ function json_headers(int $statusCode = 200): void {
 }
 
 /**
- * Send standard success response
- * 
+ * Send standard success response with audit logging
+ *
  * @param array|object $data Response data
  * @param string $message Success message (optional)
  * @param array $meta Additional metadata (optional)
  * @param int $statusCode HTTP status code (default: 200)
+ * @param string $event_type Audit event type for compliance (optional)
+ * @param array $audit_options Additional audit logging options (optional)
  */
-function json_ok($data = null, string $message = 'Success', array $meta = [], int $statusCode = 200): void {
+function json_ok($data = null, string $message = 'Success', array $meta = [], int $statusCode = 200, string $event_type = null, array $audit_options = []): void {
     json_headers($statusCode);
     
     $response = [
@@ -122,19 +142,40 @@ function json_ok($data = null, string $message = 'Success', array $meta = [], in
     // Add request ID for tracking
     $response['request_id'] = bin2hex(random_bytes(8));
     
+    // Log successful API response for compliance
+    if ($event_type && function_exists('log_audit_event')) {
+        $audit_options = array_merge([
+            'user_id' => $_SESSION['user_id'] ?? null,
+            'admin_id' => $_SESSION['is_admin'] ? $_SESSION['user_id'] : null,
+            'severity' => 'low',
+            'status' => 'success',
+            'target_type' => 'api_endpoint',
+            'metadata' => [
+                'http_status' => $statusCode,
+                'request_method' => $_SERVER['REQUEST_METHOD'] ?? '',
+                'request_uri' => $_SERVER['REQUEST_URI'] ?? '',
+                'response_size' => strlen(json_encode($response))
+            ]
+        ], $audit_options);
+        
+        log_audit_event($event_type, 'user_action', $message, $audit_options);
+    }
+    
     echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     exit;
 }
 
 /**
- * Send standard error response
- * 
+ * Send standard error response with audit logging
+ *
  * @param string $code Error code (must exist in ERROR_CODES)
  * @param string $message Custom error message (optional)
  * @param array $details Additional error details (optional)
  * @param mixed $data Response data for partial success cases (optional)
+ * @param string $event_type Audit event type for compliance (optional)
+ * @param array $audit_options Additional audit logging options (optional)
  */
-function json_fail(string $code, string $message = '', array $details = [], $data = null): void {
+function json_fail(string $code, string $message = '', array $details = [], $data = null, string $event_type = null, array $audit_options = []): void {
     if (!isset(ERROR_CODES[$code])) {
         $code = 'SERVER_ERROR'; // Fallback to generic error
     }
@@ -174,6 +215,49 @@ function json_fail(string $code, string $message = '', array $details = [], $dat
                 'is_admin' => $_SESSION['is_admin'] ?? 0
             ]
         ];
+    }
+    
+    // Log error response for compliance and security monitoring
+    if (function_exists('log_audit_event')) {
+        $severity = 'low';
+        $event_category = 'user_action';
+        
+        // Determine severity and category based on error code
+        switch ($code) {
+            case 'UNAUTHORIZED':
+            case 'FORBIDDEN':
+            case 'CSRF_MISMATCH':
+                $severity = 'medium';
+                $event_category = 'security_event';
+                break;
+            case 'RATE_LIMITED':
+                $severity = 'medium';
+                $event_category = 'security_event';
+                break;
+            case 'SERVER_ERROR':
+            case 'DATABASE_ERROR':
+                $severity = 'high';
+                $event_category = 'system_event';
+                break;
+        }
+        
+        $audit_options = array_merge([
+            'user_id' => $_SESSION['user_id'] ?? null,
+            'admin_id' => $_SESSION['is_admin'] ? $_SESSION['user_id'] : null,
+            'severity' => $severity,
+            'status' => 'failure',
+            'target_type' => 'api_endpoint',
+            'metadata' => [
+                'error_code' => $code,
+                'http_status' => $statusCode,
+                'request_method' => $_SERVER['REQUEST_METHOD'] ?? '',
+                'request_uri' => $_SERVER['REQUEST_URI'] ?? '',
+                'error_details' => $details
+            ]
+        ], $audit_options);
+        
+        $log_event_type = $event_type ?? "api_error_$code";
+        log_audit_event($log_event_type, $event_category, $message ?: $errorInfo['message'], $audit_options);
     }
     
     echo json_encode($response, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
@@ -261,7 +345,7 @@ function require_active_user_json(string $message = ''): bool {
 
 /**
  * Require admin privileges and return JSON error if not admin
- * 
+ *
  * @param string $message Custom error message (optional)
  * @return bool True if admin, exits if not
  */
@@ -269,6 +353,19 @@ function require_admin_json(string $message = ''): bool {
     require_login_json($message);
     
     if (empty($_SESSION['is_admin'])) {
+        // Log unauthorized admin access attempt
+        if (function_exists('log_security_event')) {
+            log_security_event('unauthorized_admin_access', 'Admin access attempted without proper privileges', [
+                'user_id' => $_SESSION['user_id'] ?? null,
+                'target_type' => 'admin_endpoint',
+                'metadata' => [
+                    'request_uri' => $_SERVER['REQUEST_URI'] ?? '',
+                    'request_method' => $_SERVER['REQUEST_METHOD'] ?? ''
+                ],
+                'severity' => 'high',
+                'status' => 'failure'
+            ]);
+        }
         json_forbidden($message ?: 'Admin privileges required');
     }
     

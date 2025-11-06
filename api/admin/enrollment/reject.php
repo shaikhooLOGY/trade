@@ -2,11 +2,12 @@
 /**
  * api/admin/enrollment/reject.php
  *
- * Admin API - Reject MTM enrollment
+ * Admin API - Reject MTM enrollment with authoritative audit trail
  * POST /api/admin/enrollment/reject.php
  */
 
 require_once __DIR__ . '/../../_bootstrap.php';
+require_once __DIR__ . '/../../includes/logger/audit_log.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -58,7 +59,7 @@ try {
     try {
         // Get enrollment details
         $stmt = $mysqli->prepare("
-            SELECT 
+            SELECT
                 e.id,
                 e.user_id,
                 e.model_id,
@@ -118,8 +119,8 @@ try {
         
         // Reject the enrollment
         $rejectStmt = $mysqli->prepare("
-            UPDATE mtm_enrollments 
-            SET 
+            UPDATE mtm_enrollments
+            SET
                 status = 'rejected',
                 rejected_at = NOW(),
                 rejected_by = ?,
@@ -143,17 +144,19 @@ try {
             throw new Exception('Failed to reject enrollment');
         }
         
-        // Log the enrollment rejection
-        $auditLog = sprintf(
-            'mtm_enrollment_reject|%d|%d|%d|%s|%s|%s',
-            $enrollmentId,
-            $enrollment['user_id'],
+        // Log the enrollment rejection using authoritative audit function
+        audit_approve(
             $adminId,
-            $enrollment['model_name'],
-            $rejectionReason ?: '',
-            $adminNotes ?: ''
+            'reject',
+            'enrollment',
+            $enrollmentId,
+            sprintf('Admin rejected enrollment for user %s (%s) in model %s. Reason: %s',
+                $enrollment['user_name'],
+                $enrollment['user_email'],
+                $enrollment['model_name'],
+                $rejectionReason ?: 'No reason provided'
+            )
         );
-        app_log('info', $auditLog);
         
         // Commit the transaction
         $mysqli->commit();
@@ -187,6 +190,15 @@ try {
     }
     
 } catch (Exception $e) {
+    // Log admin error using authoritative audit function
+    audit_admin_action(
+        $adminId ?? null,
+        'system_error',
+        'enrollment_rejection',
+        $enrollmentId ?? null,
+        'Admin enrollment reject error: ' . $e->getMessage()
+    );
+    
     app_log('error', 'Admin enrollment reject error: ' . $e->getMessage());
     json_fail('SERVER_ERROR', 'Failed to reject enrollment');
 }

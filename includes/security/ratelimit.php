@@ -1,15 +1,17 @@
 <?php
 /**
  * includes/security/ratelimit.php
- * 
+ *
  * Session-based rate limiting system for PHP trading platform
- * 
+ *
  * Provides:
- * - limit_per_route($key, $max_per_minute) - Rate limit by route
+ * - rate_limit($bucket, $limitPerMin, $key = null) - Main rate limiting function
+ * - require_rate_limit($bucket, $n) - Central helper for easy integration
+ * - limit_per_route($key, $max_per_minute) - Legacy rate limit by route
  * - Environment-based configuration for different request types
  * - Session + IP based tracking for distributed systems
  * - Different limits for GET, MUTATING, and Admin operations
- * 
+ *
  * Configuration (via environment variables):
  * - RATE_LIMIT_GET: Rate limit for GET requests (default: 120/min)
  * - RATE_LIMIT_MUT: Rate limit for mutating requests (default: 30/min)
@@ -290,9 +292,121 @@ function rate_limit_clear_all(): void {
 }
 
 /**
+ * Main rate limiting function as specified in requirements
+ *
+ * @param string $bucket Rate limit bucket/key identifier
+ * @param int $limitPerMinute Maximum requests per minute
+ * @param string|null $key Custom key (defaults to user_id|ip)
+ * @return bool True if allowed, false if rate limited
+ */
+function rate_limit(string $bucket, int $limitPerMinute, ?string $key = null): bool {
+    // Initialize rate limiting storage
+    rate_limit_init();
+    
+    // Generate default key if not provided
+    if ($key === null) {
+        $userId = $_SESSION['user_id'] ?? 'anonymous';
+        $ipAddress = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $key = $userId . '|' . $ipAddress;
+    }
+    
+    $fullKey = $key . ':' . $bucket;
+    
+    // Clean expired entries
+    $now = time();
+    $_SESSION['rate_limits'] = rate_limit_clean($_SESSION['rate_limits'], $now);
+    
+    // Check if key exists and get current count
+    if (!isset($_SESSION['rate_limits'][$fullKey])) {
+        $_SESSION['rate_limits'][$fullKey] = [
+            'count' => 0,
+            'first_request' => $now,
+            'requests' => []
+        ];
+    }
+    
+    $limitData = &$_SESSION['rate_limits'][$fullKey];
+    
+    // Clean old requests within the window
+    $windowStart = $now - 60; // 60 second window
+    $limitData['requests'] = array_filter(
+        $limitData['requests'],
+        function($timestamp) use ($windowStart) {
+            return $timestamp > $windowStart;
+        }
+    );
+    
+    // Update count
+    $limitData['count'] = count($limitData['requests']);
+    
+    // Check if rate limit exceeded
+    if ($limitData['count'] >= $limitPerMinute) {
+        // Log rate limit violation
+        rate_limit_log_violation($bucket, $limitData['count'], $limitPerMinute);
+        
+        return false; // Rate limit exceeded
+    }
+    
+    // Add current request
+    $limitData['requests'][] = $now;
+    $limitData['count']++;
+    
+    return true; // Request allowed
+}
+
+/**
+ * Central helper function for easy integration
+ * Automatically handles API vs page POST response formats
+ *
+ * @param string $bucket Rate limit bucket/key identifier
+ * @param int $n Maximum requests per minute
+ * @return bool True if allowed, exits with error if rate limited
+ */
+function require_rate_limit(string $bucket, int $n): bool {
+    $isApiRequest = (
+        strpos($_SERVER['REQUEST_URI'] ?? '', '/api/') === 0 ||
+        strpos($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') !== false ||
+        (!empty($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest')
+    );
+    
+    if (!rate_limit($bucket, $n)) {
+        if ($isApiRequest) {
+            // Return 429 JSON for API requests
+            http_response_code(429);
+            header('Content-Type: application/json');
+            header('Retry-After: 60');
+            
+            $response = [
+                'success' => false,
+                'code' => 'RATE_LIMITED',
+                'message' => 'Rate limit exceeded. Try again later.',
+                'retry_after' => 60,
+                'timestamp' => date('c')
+            ];
+            
+            echo json_encode($response, JSON_UNESCAPED_SLASHES);
+            exit;
+        } else {
+            // Die with plain text for page POST requests
+            http_response_code(429);
+            header('Content-Type: text/plain');
+            die('Too Many Requests');
+        }
+    }
+    
+    return true;
+}
+
+/**
  * Get recommended route keys for common endpoints
  */
 define('RATE_LIMIT_ROUTES', [
+    'auth:login' => 'auth:login',
+    'auth:register' => 'auth:register',
+    'auth:resend' => 'auth:resend',
+    'api:trades:create' => 'api:trades:create',
+    'api:mtm:enroll' => 'api:mtm:enroll',
+    'api:admin:approve' => 'api:admin:approve',
     'login' => 'login_attempt',
     'register' => 'registration',
     'trade_create' => 'trade_create',

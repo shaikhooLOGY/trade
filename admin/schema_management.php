@@ -4,12 +4,16 @@ require_once __DIR__ . '/../includes/env.php';
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/bootstrap.php';
 require_admin();
+require_once __DIR__ . '/../includes/security/csrf.php';
 
 require_once __DIR__ . '/../includes/schema_manager.php';
 
 $flash = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['action'])) {
+    // CSRF Protection - validate before any database operations
+    if (!validate_csrf($_POST['csrf'] ?? '')) {
+        $flash = 'Security verification failed. Please try again.';
+    } elseif (isset($_POST['action'])) {
         $schema = new SchemaManager($GLOBALS['mysqli'], true);
         
         if ($_POST['action'] === 'scan') {
@@ -107,12 +111,14 @@ $issues = $schema->detectIssues(false);
     <h2 style="margin: 0 0 15px 0;">🚀 Actions</h2>
     <div class="action-buttons">
       <form method="post" style="display: inline;">
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
         <input type="hidden" name="action" value="scan">
         <button type="submit" class="btn btn-info">🔍 Rescan Schema</button>
       </form>
       
       <?php if (!empty($issues)): ?>
       <form method="post" style="display: inline;" onsubmit="return confirm('This will execute SQL commands on your database. Are you sure?')">
+        <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
         <input type="hidden" name="action" value="fix_all">
         <button type="submit" class="btn btn-success">🔧 Fix All Issues</button>
       </form>

@@ -2,13 +2,14 @@
 /**
  * api/trades/delete.php
  *
- * Trades API - Delete trade
+ * Trades API - Delete trade with authoritative audit trail
  * DELETE /api/trades/delete.php
  *
  * Delete a trade record (owner or admin only)
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
+require_once __DIR__ . '/../../includes/logger/audit_log.php';
 
 header('Content-Type: application/json');
 
@@ -98,20 +99,28 @@ try {
         json_fail('DATABASE_ERROR', 'Failed to delete trade');
     }
     
-    // Audit log successful trade deletion
-    app_log('audit', json_encode([
-        'event_type' => $hasDeletedAt ? 'trade_delete_soft' : 'trade_delete_hard',
-        'trade_id' => $tradeId,
-        'trader_id' => $userId,
-        'symbol' => $trade['symbol'],
-        'is_admin' => $isAdmin
-    ]));
+    // Log successful trade deletion using authoritative audit function
+    audit_trade_create(
+        $userId,
+        $hasDeletedAt ? 'soft_delete' : 'delete',
+        $tradeId,
+        sprintf('Trade %s successfully - Symbol: %s',
+            $hasDeletedAt ? 'soft deleted' : 'deleted',
+            $trade['symbol']
+        )
+    );
     
     json_ok(['id' => $tradeId, 'deleted' => true], 'Trade deleted successfully');
     
 } catch (Exception $e) {
-    // Log error
-    app_log('error', 'trade_delete_api_error: ' . $e->getMessage());
+    // Log error using authoritative audit function
+    audit_trade_create(
+        $_SESSION['user_id'] ?? null,
+        'system_error',
+        $tradeId ?? null,
+        'Trade delete API error: ' . $e->getMessage()
+    );
     
+    app_log('error', 'trade_delete_api_error: ' . $e->getMessage());
     json_fail('SERVER_ERROR', 'Failed to delete trade');
 }

@@ -2,11 +2,13 @@
 /**
  * api/admin/enrollment/approve.php
  *
- * Admin API - Approve MTM enrollment
+ * Admin API - Approve MTM enrollment with authoritative audit trail
  * POST /api/admin/enrollment/approve.php
  */
 
 require_once __DIR__ . '/../../_bootstrap.php';
+require_once __DIR__ . '/../../includes/security/ratelimit.php';
+require_once __DIR__ . '/../../includes/logger/audit_log.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -32,6 +34,9 @@ try {
     // Check CSRF for mutating operations
     csrf_api_middleware();
     
+    // Rate limiting: 10 per minute
+    require_rate_limit('api:admin:approve', 10);
+    
     // Get JSON input
     $input = get_json_input();
     
@@ -52,7 +57,7 @@ try {
     try {
         // Get enrollment details
         $stmt = $mysqli->prepare("
-            SELECT 
+            SELECT
                 e.id,
                 e.user_id,
                 e.model_id,
@@ -97,8 +102,8 @@ try {
         
         // Validate model is active
         $modelStmt = $mysqli->prepare("
-            SELECT status, start_date, end_date 
-            FROM mtm_models 
+            SELECT status, start_date, end_date
+            FROM mtm_models
             WHERE id = ?
         ");
         
@@ -136,8 +141,8 @@ try {
         
         // Check user status
         $userStmt = $mysqli->prepare("
-            SELECT status, email_verified 
-            FROM users 
+            SELECT status, email_verified
+            FROM users
             WHERE id = ?
         ");
         
@@ -163,10 +168,10 @@ try {
         
         // Check for duplicate active enrollments
         $duplicateStmt = $mysqli->prepare("
-            SELECT COUNT(*) as count 
-            FROM mtm_enrollments 
-            WHERE user_id = ? 
-            AND model_id = ? 
+            SELECT COUNT(*) as count
+            FROM mtm_enrollments
+            WHERE user_id = ?
+            AND model_id = ?
             AND status = 'approved'
             AND id != ?
         ");
@@ -195,8 +200,8 @@ try {
         
         // Approve the enrollment
         $approveStmt = $mysqli->prepare("
-            UPDATE mtm_enrollments 
-            SET 
+            UPDATE mtm_enrollments
+            SET
                 status = 'approved',
                 approved_at = NOW(),
                 approved_by = ?,
@@ -219,16 +224,18 @@ try {
             throw new Exception('Failed to approve enrollment');
         }
         
-        // Log the enrollment approval
-        $auditLog = sprintf(
-            'mtm_enrollment_approve|%d|%d|%d|%s|%s',
-            $enrollmentId,
-            $enrollment['user_id'],
+        // Log the enrollment approval using authoritative audit function
+        audit_approve(
             $adminId,
-            $enrollment['model_name'],
-            $adminNotes ?: ''
+            'approve',
+            'enrollment',
+            $enrollmentId,
+            sprintf('Admin approved enrollment for user %s (%s) in model %s',
+                $enrollment['user_name'],
+                $enrollment['user_email'],
+                $enrollment['model_name']
+            )
         );
-        app_log('info', $auditLog);
         
         // Commit the transaction
         $mysqli->commit();
@@ -259,6 +266,15 @@ try {
     }
     
 } catch (Exception $e) {
+    // Log admin error using authoritative audit function
+    audit_admin_action(
+        $adminId ?? null,
+        'system_error',
+        'enrollment_approval',
+        $enrollmentId ?? null,
+        'Admin enrollment approve error: ' . $e->getMessage()
+    );
+    
     app_log('error', 'Admin enrollment approve error: ' . $e->getMessage());
     json_fail('SERVER_ERROR', 'Failed to approve enrollment');
 }

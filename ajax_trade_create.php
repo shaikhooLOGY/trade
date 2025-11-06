@@ -12,6 +12,7 @@ ini_set('display_errors', 0);
 error_reporting(E_ALL);
 
 require_once __DIR__ . '/config.php'; // must start session and provide $mysqli
+require_once __DIR__ . '/includes/security/csrf.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -28,6 +29,14 @@ try {
         http_response_code(405);
         ob_clean();
         echo json_encode(['error' => 'Method not allowed']);
+        exit;
+    }
+
+    // CSRF Protection - validate before any DB operations
+    if (!validate_csrf($_POST['csrf'] ?? '')) {
+        http_response_code(403);
+        ob_clean();
+        echo json_encode(['error' => 'CSRF failed']);
         exit;
     }
 
@@ -185,69 +194,4 @@ try {
     http_response_code(500);
     echo json_encode(['error' => 'Server error', 'detail' => $e->getMessage()]);
     exit;
-}
-``
-
----
-
-## B) Robust JS fetch (replace existing fetch calls)
-
-Dashboard में जहाँ भी आप `fetch('ajax_trade_create.php', ...)` कर रहे हैं, use यह improved code — यह response को पहले text में लेगा, फिर try/catch से JSON parse करेगा और अगर HTML/warning मिला तो console में raw दिखाएगा और user को readable message दिखाएगा.
-
-```javascript
-// Example usage: replace your current fetch(...) call for ajax_trade_create.php with this
-const form = document.getElementById('tradeQuickForm'); // or tradeForm / proper form reference
-const btn = document.getElementById('tradeSaveBtn');
-
-btn.addEventListener('click', function(e){
-  // if using button type=submit, let form submit handler call fetch; this is example for manual fetch
-});
-
-async function submitTrade(fd) {
-  btn.disabled = true;
-  btn.textContent = 'Saving...';
-  try {
-    const res = await fetch('/competition/ajax_trade_create.php', {
-      method: 'POST',
-      body: fd,
-      credentials: 'same-origin'
-    });
-
-    const text = await res.text();
-
-    let data;
-    try {
-      data = JSON.parse(text);
-    } catch (err) {
-      console.error('Non-JSON response from server — raw output:', text);
-      alert('Server returned unexpected response. Check console for details.');
-      btn.disabled = false;
-      btn.textContent = 'Save trade';
-      return;
-    }
-
-    if (!res.ok) {
-      // server sent JSON error message
-      alert('Save failed: ' + (data.error || 'Unknown error'));
-      btn.disabled = false;
-      btn.textContent = 'Save trade';
-      return;
-    }
-
-    // success
-    if (data.success) {
-      // update UI, prepend row etc.
-      alert('Trade saved. Points: ' + (data.trade.points ?? '—'));
-      // ... your UI update code ...
-    } else {
-      alert('Unexpected response: ' + JSON.stringify(data));
-    }
-
-  } catch (err) {
-    console.error('Fetch failed', err);
-    alert('Network error: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Save trade';
-  }
 }

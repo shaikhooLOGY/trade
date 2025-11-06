@@ -1,0 +1,1081 @@
+openapi: 3.0.3
+info:
+  title: PHP Trading Platform API
+  description: |
+    Comprehensive API documentation for a PHP-based trading platform with MTM (Model Training Management) system.
+    
+    ## Authentication
+    The platform uses session-based authentication:
+    - **Session Token**: Stored in `$_SESSION['user_id']` and `$_SESSION['csrf_token']`
+    - **Admin Access**: Controlled by `$_SESSION['is_admin'] === 1`
+    - **Active User**: Requires email verification and approved status
+    
+    ## Response Format
+    All API endpoints return consistent response format:
+    ```json
+    {
+      "success": boolean,
+      "code": string,
+      "message": string,
+      "details": object?
+    }
+    ```
+    
+    ## Rate Limiting
+    - **API Endpoints**: 5-10 requests per minute (session-based)
+    - **Admin Endpoints**: No rate limiting (security concern)
+    
+    ## Security Features
+    - CSRF protection for admin and select API endpoints
+    - Session-based rate limiting
+    - SQL injection protection via prepared statements
+    - Input validation and sanitization
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@tradingplatform.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://tradingplatform.local
+    description: Local Development Server
+  - url: https://api.tradingplatform.com
+    description: Production Server
+
+security:
+  - SessionAuth: []
+  - AdminAuth: []
+
+paths:
+  # === MTM (Model Training Management) APIs ===
+  /api/mtm/enroll:
+    post:
+      tags:
+        - MTM
+      summary: Enroll in MTM Model
+      description: |
+        Allows authenticated users to enroll in a specific MTM (Model Training Management) model at a specific tier.
+        
+        **Security**: 
+        - Requires login and active user status
+        - CSRF protection enforced
+        - Rate limited: 5 requests per minute
+        
+        **Body**: 
+        - JSON input with model_id, tier, and CSRF token
+        - Validates tier must be basic, intermediate, or advanced
+        
+      operationId: enrollMtmModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - model_id
+                - tier
+                - csrf_token
+              properties:
+                model_id:
+                  type: integer
+                  description: ID of the MTM model to enroll in
+                  minimum: 1
+                  example: 123
+                tier:
+                  type: string
+                  description: Enrollment tier level
+                  enum: [basic, intermediate, advanced]
+                  example: basic
+                csrf_token:
+                  type: string
+                  description: CSRF protection token from session
+                  example: "a8f5f167f44f4964e6c998dee827110c"
+      responses:
+        '200':
+          description: Enrollment successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - enrollment_id
+                  - unlocked_task_id
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  enrollment_id:
+                    type: integer
+                    description: Unique enrollment ID
+                    example: 456
+                  unlocked_task_id:
+                    type: integer
+                    description: First unlocked task ID in the model
+                    example: 789
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                code: VALIDATION_ERROR
+                message: "model_id must be a positive integer"
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Already enrolled in model
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                code: ALREADY_ENROLLED
+                message: "Trader is already enrolled in this model"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: "Rate limit exceeded. Try again later."
+                retry_after: 60
+
+  /api/mtm/enrollments:
+    get:
+      tags:
+        - MTM
+      summary: Get User MTM Enrollments
+      description: |
+        Retrieves all MTM enrollments for the authenticated trader.
+        
+        **Security**: 
+        - Requires login and active user status
+        - Rate limited: 10 requests per minute
+        
+        **Query Parameters**: None required
+        
+      operationId: getMtmEnrollments
+      responses:
+        '200':
+          description: Enrollments retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - items
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MtmEnrollment'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # === Trade APIs ===
+  /api/trades/create:
+    post:
+      tags:
+        - Trades
+      summary: Create New Trade
+      description: |
+        Creates a new trade record for the authenticated trader.
+        
+        **Security**: 
+        - Requires login and active user status
+        - Input validation and sanitization
+        - Rate limited: 10 requests per minute
+        
+        **Body**: 
+        - JSON input with trade details
+        - Validates symbol, side (buy/sell), quantity, price, and opened_at date
+        
+      operationId: createTrade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+                - side
+                - quantity
+                - price
+                - opened_at
+              properties:
+                symbol:
+                  type: string
+                  description: Trading symbol/stock ticker
+                  maxLength: 32
+                  example: "AAPL"
+                side:
+                  type: string
+                  description: Trade direction
+                  enum: [buy, sell]
+                  example: "buy"
+                quantity:
+                  type: number
+                  description: Number of shares/units
+                  minimum: 0
+                  exclusiveMinimum: true
+                  example: 100
+                price:
+                  type: number
+                  description: Entry price per share
+                  minimum: 0
+                  exclusiveMinimum: true
+                  example: 150.25
+                opened_at:
+                  type: string
+                  format: date-time
+                  description: Trade opening timestamp
+                  example: "2025-11-05T10:30:00Z"
+                notes:
+                  type: string
+                  description: Trade notes (optional)
+                  maxLength: 1000
+                  example: "Long-term growth position"
+      responses:
+        '200':
+          description: Trade created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - id
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  id:
+                    type: integer
+                    description: Created trade ID
+                    example: 1001
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                allOf:
+                  - $ref: '#/components/schemas/ErrorResponse'
+                  - type: object
+                    properties:
+                      errors:
+                        type: object
+                        description: Field-specific validation errors
+                        example:
+                          symbol: "Symbol is required"
+                          quantity: "Quantity must be greater than zero"
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/trades/list:
+    get:
+      tags:
+        - Trades
+      summary: List User Trades
+      description: |
+        Retrieves trade history for the authenticated trader with optional filtering.
+        
+        **Security**: 
+        - Requires login and active user status
+        - Rate limited: 10 requests per minute
+        
+        **Query Parameters**:
+        - Optional filtering by symbol, date range
+        - Pagination support with limit/offset
+        
+      operationId: listTrades
+      parameters:
+        - name: symbol
+          in: query
+          description: Filter by trading symbol
+          schema:
+            type: string
+            maxLength: 32
+        - name: from
+          in: query
+          description: Filter trades from date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+            example: "2025-01-01"
+        - name: to
+          in: query
+          description: Filter trades to date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+            example: "2025-12-31"
+        - name: limit
+          in: query
+          description: Number of trades to return (max 200)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: offset
+          in: query
+          description: Number of trades to skip
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Trades retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - items
+                  - pagination
+                  - filters
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Trade'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                  filters:
+                    type: object
+                    properties:
+                      symbol:
+                        type: string
+                      from:
+                        type: string
+                        format: date
+                      to:
+                        type: string
+                        format: date
+        '400':
+          description: Invalid query parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # === Utility APIs ===
+  /api/util/csrf:
+    get:
+      tags:
+        - Utility
+      summary: Get CSRF Token
+      description: |
+        Retrieves the current CSRF token for the session.
+        
+        **Security**: 
+        - Requires login
+        - No rate limiting
+        
+      operationId: getCsrfToken
+      responses:
+        '200':
+          description: CSRF token retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - csrf_token
+                properties:
+                  csrf_token:
+                    type: string
+                    description: Current CSRF token from session
+                    example: "a8f5f167f44f4964e6c998dee827110c"
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # === Admin User Management ===
+  /admin/user_action:
+    post:
+      tags:
+        - Admin
+        - User Management
+      summary: Admin User Actions
+      description: |
+        Centralized endpoint for admin user management actions.
+        
+        **Security**: 
+        - Requires admin privileges (is_admin = 1)
+        - CSRF protection enforced
+        - No rate limiting (security concern)
+        
+        **Actions Available**:
+        - approve: Activate user account
+        - send_back: Request user profile updates
+        - send_back_detail: Detailed field-level feedback
+        - reject: Permanently reject user
+        - activate: Re-activate rejected user
+        - promote: Grant admin privileges
+        - demote: Remove admin privileges
+        - delete: Permanently delete user
+        
+      operationId: adminUserAction
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - id
+                - action
+                - csrf
+              properties:
+                id:
+                  type: integer
+                  description: Target user ID
+                  minimum: 1
+                action:
+                  type: string
+                  description: Action to perform
+                  enum: [approve, send_back, send_back_detail, reject, activate, promote, demote, delete]
+                csrf:
+                  type: string
+                  description: Admin CSRF token
+                reason:
+                  type: string
+                  description: Reason for actions (required for send_back, reject)
+      responses:
+        '302':
+          description: Action completed - redirects to users.php with flash message
+        '400':
+          description: Invalid request
+        '403':
+          description: Admin access required
+        '500':
+          description: Database or server error
+
+  # === Dashboard Trade Actions ===
+  /dashboard:
+    post:
+      tags:
+        - Dashboard
+        - Trades
+      summary: Dashboard Trade Actions
+      description: |
+        Handles trade actions from the main dashboard.
+        
+        **Security**: 
+        - Requires login
+        - CSRF protection for state-changing operations
+        
+        **Actions**:
+        - soft_delete: Soft delete trade (sets deleted_at timestamp)
+        
+      operationId: dashboardTradeAction
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - csrf
+                - action
+              properties:
+                csrf:
+                  type: string
+                  description: Session CSRF token
+                action:
+                  type: string
+                  description: Action to perform
+                  enum: [soft_delete]
+                trade_id:
+                  type: integer
+                  description: Target trade ID (required for soft_delete)
+      responses:
+        '302':
+          description: Action completed - redirects to dashboard
+        '400':
+          description: Invalid request or CSRF validation failed
+
+  # === User Profile Management ===
+  /profile:
+    get:
+      tags:
+        - Profile
+      summary: View User Profile
+      description: |
+        Retrieves the current user's profile information and account status.
+        
+        **Security**: 
+        - Requires login
+        
+      operationId: viewProfile
+      responses:
+        '200':
+          description: Profile retrieved
+          content:
+            text/html:
+              schema:
+                type: string
+                description: HTML profile page
+        '401':
+          description: Authentication required
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Redirect to login page
+        '500':
+          description: Server error
+          
+    post:
+      tags:
+        - Profile
+      summary: Update User Profile
+      description: |
+        Updates the current user's profile information.
+        
+        **Security**: 
+        - Requires login
+        - CSRF protection recommended
+        
+      operationId: updateProfile
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: User's full name
+                  maxLength: 255
+                # Additional profile fields based on profile_fields.php configuration
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            text/html:
+              schema:
+                type: string
+                description: Updated HTML profile page
+        '400':
+          description: Validation error
+        '500':
+          description: Database error
+
+  # === Trade Management ===
+  /trade_new:
+    get:
+      tags:
+        - Trades
+      summary: New Trade Form
+      description: |
+        Displays the form for creating a new trade entry.
+        
+        **Security**: 
+        - Requires login
+        - May be locked if user has active MTM enrollment
+        
+      operationId: newTradeForm
+      parameters:
+        - name: mtm_task
+          in: query
+          description: MTM task ID for guided trade entry
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: New trade form
+          content:
+            text/html:
+              schema:
+                type: string
+        '302':
+          description: Redirect to login if not authenticated
+        '403':
+          description: Access denied - MTM enrollment active
+
+  /trade_edit:
+    get:
+      tags:
+        - Trades
+      summary: Edit Trade Form
+      description: |
+        Displays the form for editing an existing trade.
+        
+        **Security**: 
+        - Requires login
+        - Trade must belong to user
+        - Only editable if trade is not closed
+        
+      operationId: editTradeForm
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: Trade ID to edit
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Edit trade form
+          content:
+            text/html:
+              schema:
+                type: string
+        '302':
+          description: Redirect to login if not authenticated
+        '404':
+          description: Trade not found or access denied
+
+  /trade_delete:
+    post:
+      tags:
+        - Trades
+      summary: Delete Trade
+      description: |
+        Soft deletes a trade (sets deleted_at timestamp if available, otherwise hard delete).
+        
+        **Security**: 
+        - Requires login
+        - Trade must belong to user
+        - CSRF protection recommended
+        
+      operationId: deleteTrade
+      responses:
+        '302':
+          description: Action completed - redirects back
+        '400':
+          description: Invalid request
+        '403':
+          description: Access denied
+        '500':
+          description: Database error
+
+  /trade_unlock_request:
+    get:
+      tags:
+        - Trades
+      summary: Unlock Trade Request
+      description: |
+        Displays form to request unlocking of a closed trade for editing.
+        
+        **Security**: 
+        - Requires login
+        - Trade must be closed and belong to user
+        
+      operationId: unlockRequestForm
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: Trade ID to request unlock
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Unlock request form
+          content:
+            text/html:
+              schema:
+                type: string
+        '302':
+          description: Redirect to login if not authenticated
+
+  # === MTM User Interface ===
+  /mtm:
+    get:
+      tags:
+        - MTM
+      summary: MTM Programs Overview
+      description: |
+        Main MTM (Model Training Management) programs page.
+        
+        **Security**: 
+        - Requires login
+        
+      operationId: mtmPrograms
+      responses:
+        '200':
+          description: MTM programs page
+          content:
+            text/html:
+              schema:
+                type: string
+        '302':
+          description: Redirect to login if not authenticated
+
+  /mtm_enroll:
+    get:
+      tags:
+        - MTM
+      summary: MTM Enrollment
+      description: |
+        MTM enrollment page for users to view available models and enroll.
+        
+        **Security**: 
+        - Requires login and active user status
+        
+      operationId: mtmEnrollment
+      responses:
+        '200':
+          description: Enrollment page
+          content:
+            text/html:
+              schema:
+                type: string
+        '302':
+          description: Redirect based on authentication status
+
+  /mtm_model_user:
+    get:
+      tags:
+        - MTM
+      summary: User MTM Model View
+      description: |
+        Displays the user's enrolled MTM model with progress tracking.
+        
+        **Security**: 
+        - Requires login and active enrollment
+        
+      operationId: userMtmModel
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: Model ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User model view
+          content:
+            text/html:
+              schema:
+                type: string
+        '302':
+          description: Redirect if not enrolled or not authenticated
+        '404':
+          description: Model not found
+
+components:
+  securitySchemes:
+    SessionAuth:
+      type: apiKey
+      in: header
+      name: PHPSESSID
+      description: PHP Session ID cookie for authentication
+    AdminAuth:
+      type: apiKey
+      in: header
+      name: PHPSESSID
+      description: PHP Session ID with admin privileges (is_admin=1)
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - code
+        - message
+      properties:
+        success:
+          type: boolean
+          example: false
+        code:
+          type: string
+          description: Error code for programmatic handling
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "The request contains invalid parameters"
+        details:
+          type: object
+          description: Additional error details (optional)
+          
+    MtmEnrollment:
+      type: object
+      required:
+        - id
+        - model_id
+        - model_code
+        - model_name
+        - tier
+        - status
+        - started_at
+      properties:
+        id:
+          type: integer
+          description: Enrollment ID
+          example: 456
+        model_id:
+          type: integer
+          description: MTM model ID
+          example: 123
+        model_code:
+          type: string
+          description: Model code/identifier
+          example: "MTM-BASIC-001"
+        model_name:
+          type: string
+          description: Human-readable model name
+          example: "Basic Trading Fundamentals"
+        tier:
+          type: string
+          description: Enrollment tier
+          enum: [basic, intermediate, advanced]
+          example: basic
+        status:
+          type: string
+          description: Enrollment status
+          enum: [pending, approved, active, completed, archived]
+          example: approved
+        started_at:
+          type: string
+          format: date-time
+          description: Enrollment start date
+          example: "2025-11-01T10:00:00Z"
+          
+    Trade:
+      type: object
+      required:
+        - id
+        - symbol
+        - side
+        - quantity
+        - price
+        - opened_at
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: Unique trade ID
+          example: 1001
+        symbol:
+          type: string
+          description: Trading symbol/stock ticker
+          example: "AAPL"
+        side:
+          type: string
+          description: Trade direction
+          enum: [buy, sell]
+          example: "buy"
+        quantity:
+          type: number
+          description: Number of shares/units
+          example: 100
+        price:
+          type: number
+          description: Entry price per share
+          example: 150.25
+        opened_at:
+          type: string
+          format: date-time
+          description: Trade opening timestamp
+          example: "2025-11-05T10:30:00Z"
+        closed_at:
+          type: string
+          format: date-time
+          description: Trade closing timestamp (if closed)
+          example: "2025-11-05T14:45:00Z"
+        notes:
+          type: string
+          description: Trade notes and analysis
+          example: "Long-term growth position based on quarterly earnings"
+        created_at:
+          type: string
+          format: date-time
+          description: Trade creation timestamp
+          example: "2025-11-05T10:30:00Z"
+          
+    Pagination:
+      type: object
+      required:
+        - limit
+        - offset
+        - count
+      properties:
+        limit:
+          type: integer
+          description: Maximum number of items returned
+          example: 50
+        offset:
+          type: integer
+          description: Number of items skipped
+          example: 0
+        count:
+          type: integer
+          description: Actual number of items returned
+          example: 25
+          
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - role
+        - status
+      properties:
+        id:
+          type: integer
+          description: User ID
+          example: 123
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "user@example.com"
+        name:
+          type: string
+          description: User's full name
+          example: "John Doe"
+        role:
+          type: string
+          description: User role
+          enum: [user, admin, superadmin]
+          example: user
+        status:
+          type: string
+          description: Account status
+          enum: [pending, active, needs_update, rejected]
+          example: active
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation date
+          example: "2025-01-15T08:00:00Z"
+          
+    MtmModel:
+      type: object
+      required:
+        - id
+        - title
+        - code
+        - difficulty
+        - estimated_days
+        - status
+      properties:
+        id:
+          type: integer
+          description: Model ID
+          example: 123
+        title:
+          type: string
+          description: Model title
+          example: "Basic Trading Fundamentals"
+        code:
+          type: string
+          description: Model code
+          example: "MTM-BASIC-001"
+        difficulty:
+          type: string
+          description: Difficulty level
+          enum: [easy, moderate, hard]
+          example: easy
+        estimated_days:
+          type: integer
+          description: Estimated completion time in days
+          example: 30
+        status:
+          type: string
+          description: Model status
+          enum: [draft, active, paused, archived]
+          example: active
+        description:
+          type: string
+          description: Model description
+          example: "Learn fundamental trading concepts and risk management"
+        cover_image_path:
+          type: string
+          description: Path to model cover image
+          example: "/img/mtm/basic-fundamentals.jpg"
+
+tags:
+  - name: MTM
+    description: Model Training Management APIs for structured trading programs
+  - name: Trades
+    description: Trade management and trading journal operations
+  - name: Dashboard
+    description: Main trading dashboard functionality
+  - name: Profile
+    description: User profile and account management
+  - name: Admin
+    description: Administrative functions and user management
+  - name: Utility
+    description: Utility functions and helper endpoints
+  - name: User Management
+    description: Admin user management operations
+
+externalDocs:
+  description: Complete API Documentation
+  url: https://docs.tradingplatform.com/api

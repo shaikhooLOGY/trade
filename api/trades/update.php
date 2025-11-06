@@ -2,13 +2,14 @@
 /**
  * api/trades/update.php
  *
- * Trades API - Update trade
+ * Trades API - Update trade with authoritative audit trail
  * POST/PUT /api/trades/update.php
  *
  * Update a trade record (owner or admin only)
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
+require_once __DIR__ . '/../../includes/logger/audit_log.php';
 
 header('Content-Type: application/json');
 
@@ -108,20 +109,27 @@ try {
         json_fail('VALIDATION_ERROR', 'No changes made to trade');
     }
     
-    // Audit log successful trade update
-    app_log('audit', json_encode([
-        'event_type' => 'trade_update_success',
-        'trade_id' => $tradeId,
-        'trader_id' => $userId,
-        'updated_fields' => array_keys(array_intersect_key($input, array_flip($allowedFields))),
-        'is_admin' => $isAdmin
-    ]));
+    // Log successful trade update using authoritative audit function
+    audit_trade_create(
+        $userId,
+        'update',
+        $tradeId,
+        sprintf('Trade updated successfully - Fields: %s',
+            implode(', ', array_keys(array_intersect_key($input, array_flip($allowedFields))))
+        )
+    );
     
     json_ok(['id' => $tradeId], 'Trade updated successfully');
     
 } catch (Exception $e) {
-    // Log error
-    app_log('error', 'trade_update_api_error: ' . $e->getMessage());
+    // Log error using authoritative audit function
+    audit_trade_create(
+        $_SESSION['user_id'] ?? null,
+        'system_error',
+        $tradeId ?? null,
+        'Trade update API error: ' . $e->getMessage()
+    );
     
+    app_log('error', 'trade_update_api_error: ' . $e->getMessage());
     json_fail('SERVER_ERROR', 'Failed to update trade');
 }

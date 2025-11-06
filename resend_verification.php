@@ -2,6 +2,11 @@
 // competition/resend_verification.php
 // Session and security handling centralized via bootstrap.php
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/security/ratelimit.php';
+require_once __DIR__ . '/includes/security/csrf.php';
+
+// Rate limit resend verification: 3 per minute
+require_rate_limit('auth:resend', 3);
 
 // helper
 if (!function_exists('h')) {
@@ -12,57 +17,62 @@ $err = '';
 $ok  = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = trim($_POST['email'] ?? '');
-    if ($email === '') {
-        $err = 'Please enter your email address.';
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $err = 'Please enter a valid email address.';
+    // CSRF Protection - validate before any email operations
+    if (!validate_csrf($_POST['csrf'] ?? '')) {
+        $err = 'Security verification failed. Please try again.';
     } else {
-        // find user by email
-        $stmt = $mysqli->prepare("SELECT id, email_verified FROM users WHERE email = ?");
-        if (!$stmt) {
-            $err = "Database error.";
+        $email = trim($_POST['email'] ?? '');
+        if ($email === '') {
+            $err = 'Please enter your email address.';
+        } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $err = 'Please enter a valid email address.';
         } else {
-            $stmt->bind_param('s', $email);
-            $stmt->execute();
-            $res = $stmt->get_result();
-            if (!$res || $res->num_rows === 0) {
-                $err = "No account found with that email.";
+            // find user by email
+            $stmt = $mysqli->prepare("SELECT id, email_verified FROM users WHERE email = ?");
+            if (!$stmt) {
+                $err = "Database error.";
             } else {
-                $row = $res->fetch_assoc();
-                if (!empty($row['email_verified'])) {
-                    $ok = "Your email is already verified. You may <a href='login.php'>log in</a>.";
+                $stmt->bind_param('s', $email);
+                $stmt->execute();
+                $res = $stmt->get_result();
+                if (!$res || $res->num_rows === 0) {
+                    $err = "No account found with that email.";
                 } else {
-                    // generate a new token and save it
-                    $token = bin2hex(random_bytes(32));
-                    $upd = $mysqli->prepare("UPDATE users SET email_token = ? WHERE id = ?");
-                    if ($upd) {
-                        $upd->bind_param('si', $token, $row['id']);
-                        if ($upd->execute()) {
-                            // Build verification URL
-                            $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                            $host = $_SERVER['HTTP_HOST'];
-                            $path = rtrim(dirname($_SERVER['REQUEST_URI']), '/\\');
-                            // make link absolute to /competition/verify.php
-                            $verifyUrl = $protocol . '://' . $host . '/competition/verify.php?token=' . $token;
+                    $row = $res->fetch_assoc();
+                    if (!empty($row['email_verified'])) {
+                        $ok = "Your email is already verified. You may <a href='login.php'>log in</a>.";
+                    } else {
+                        // generate a new token and save it
+                        $token = bin2hex(random_bytes(32));
+                        $upd = $mysqli->prepare("UPDATE users SET email_token = ? WHERE id = ?");
+                        if ($upd) {
+                            $upd->bind_param('si', $token, $row['id']);
+                            if ($upd->execute()) {
+                                // Build verification URL
+                                $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                                $host = $_SERVER['HTTP_HOST'];
+                                $path = rtrim(dirname($_SERVER['REQUEST_URI']), '/\\');
+                                // make link absolute to /competition/verify.php
+                                $verifyUrl = $protocol . '://' . $host . '/competition/verify.php?token=' . $token;
 
-                            // Send email (simple PHP mail). Replace or improve with your preferred mailer (SMTP).
-                            $subject = "Verify your Shaikhoology email";
-                            $message = "Hi,\n\nClick the link below to verify your email address for Shaikhoology:\n\n" . $verifyUrl . "\n\nIf you did not request this, ignore this message.\n\n— Shaikhoology";
-                            $headers = "From: no-reply@" . $host . "\r\nReply-To: no-reply@" . $host;
+                                // Send email (simple PHP mail). Replace or improve with your preferred mailer (SMTP).
+                                $subject = "Verify your Shaikhoology email";
+                                $message = "Hi,\n\nClick the link below to verify your email address for Shaikhoology:\n\n" . $verifyUrl . "\n\nIf you did not request this, ignore this message.\n\n— Shaikhoology";
+                                $headers = "From: no-reply@" . $host . "\r\nReply-To: no-reply@" . $host;
 
-                            // Attempt to send
-                            if (@mail($email, $subject, $message, $headers)) {
-                                $ok = "Verification email sent. Please check your inbox.";
+                                // Attempt to send
+                                if (@mail($email, $subject, $message, $headers)) {
+                                    $ok = "Verification email sent. Please check your inbox.";
+                                } else {
+                                    // If mail() fails (common on many shared hosts), show the link so you can test.
+                                    $ok = "Couldn't send mail from server. Use this verification link (testing): <br><a href='" . h($verifyUrl) . "'>" . h($verifyUrl) . "</a>";
+                                }
                             } else {
-                                // If mail() fails (common on many shared hosts), show the link so you can test.
-                                $ok = "Couldn't send mail from server. Use this verification link (testing): <br><a href='" . h($verifyUrl) . "'>" . h($verifyUrl) . "</a>";
+                                $err = "Failed to update user token.";
                             }
                         } else {
-                            $err = "Failed to update user token.";
+                            $err = "Database error (prepare).";
                         }
-                    } else {
-                        $err = "Database error (prepare).";
                     }
                 }
             }
@@ -86,6 +96,7 @@ include __DIR__ . '/header.php';
   <?php endif; ?>
 
   <form method="post" style="margin-top:12px">
+    <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
     <input name="email" type="email" placeholder="your@email.com" required
            style="width:100%;padding:12px;border:1px solid #ddd;border-radius:8px;font-size:15px">
     <div style="margin-top:12px">

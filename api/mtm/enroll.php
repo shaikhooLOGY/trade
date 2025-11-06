@@ -2,11 +2,13 @@
 /**
  * api/mtm/enroll.php
  *
- * MTM API - Enroll user in MTM model
+ * MTM API - Enroll user in MTM model with authoritative audit trail
  * POST /api/mtm/enroll.php
  */
 
 require_once __DIR__ . '/../../_bootstrap.php';
+require_once __DIR__ . '/../../includes/security/ratelimit.php';
+require_once __DIR__ . '/../../includes/logger/audit_log.php';
 
 header('Content-Type: application/json');
 
@@ -21,10 +23,8 @@ try {
     // Check CSRF for mutating operations
     csrf_api_middleware();
     
-    // Rate limiting
-    if (!rate_limit_api_middleware('mtm_enroll', 5)) {
-        exit; // Rate limit response already sent
-    }
+    // Rate limiting: 30 per minute
+    require_rate_limit('api:mtm:enroll', 30);
     
     // Read JSON input
     $input = get_json_input();
@@ -65,12 +65,32 @@ try {
     $result = mtm_enroll((int)$_SESSION['user_id'], $modelId, $tier);
     
     if ($result['success']) {
+        // Log successful enrollment using authoritative audit function
+        audit_enroll(
+            (int)$_SESSION['user_id'],
+            'enroll',
+            $result['enrollment_id'],
+            sprintf('User enrolled in MTM model ID %d at %s tier', $modelId, $tier)
+        );
+        
         // Success response
         json_ok([
             'enrollment_id' => $result['enrollment_id'],
             'unlocked_task_id' => $result['unlocked_task_id']
-        ], 'Enrollment successful');
+        ], 'Enrollment successful', [], 200);
     } else {
+        // Log failed enrollment attempt
+        audit_enroll(
+            (int)$_SESSION['user_id'],
+            'enroll_failed',
+            null,
+            sprintf('Failed to enroll user in MTM model ID %d at %s tier - Error: %s',
+                $modelId,
+                $tier,
+                $result['error'] ?? 'Unknown error'
+            )
+        );
+        
         // Handle specific error cases
         if ($result['error'] === 'ALREADY_ENROLLED') {
             json_fail('ALREADY_ENROLLED', 'Trader is already enrolled in this model');
@@ -80,6 +100,15 @@ try {
     }
     
 } catch (Exception $e) {
+    // Log system error
+    audit_admin_action(
+        $_SESSION['user_id'] ?? null,
+        'system_error',
+        'enrollment',
+        null,
+        'MTM enroll error: ' . $e->getMessage()
+    );
+    
     app_log('error', 'MTM enroll error: ' . $e->getMessage());
     json_fail('SERVER_ERROR', 'Failed to process enrollment');
 }

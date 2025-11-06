@@ -2,11 +2,12 @@
 /**
  * api/profile/update.php
  *
- * Profile API - Update current user profile
+ * Profile API - Update current user profile with authoritative audit trail
  * POST /api/profile/update.php
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
+require_once __DIR__ . '/../../includes/logger/audit_log.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -44,7 +45,7 @@ try {
     $isPasswordUpdate = isset($input['password']) && !empty($input['password']);
     if ($isPasswordUpdate) {
         // For password updates, require recent authentication (within 15 minutes)
-        if (empty($_SESSION['last_auth_check']) || 
+        if (empty($_SESSION['last_auth_check']) ||
             (time() - $_SESSION['last_auth_check']) > 900) {
             json_forbidden('Password update requires recent authentication');
         }
@@ -231,10 +232,10 @@ try {
     
     // Get updated profile to return
     $stmt = $mysqli->prepare("
-        SELECT 
+        SELECT
             id, name, display_name, email, role, status, email_verified,
             bio, location, timezone, preferences, profile_completion_score
-        FROM users 
+        FROM users
         WHERE id = ?
     ");
     
@@ -254,22 +255,30 @@ try {
         }
     }
     
-    // Log profile update
-    $changedFields = array_keys($input);
-    app_log('info', sprintf(
-        'Profile updated - User: %d, Fields: %s',
+    // Log profile update using authoritative audit function
+    audit_profile_update(
         $userId,
-        implode(', ', $changedFields)
-    ));
+        'update',
+        $userId,
+        sprintf('User profile updated - Fields: %s', implode(', ', array_keys($input)))
+    );
     
     // Return success response
     json_ok([
         'profile' => $updatedProfile ?? [],
         'updated_fields' => array_keys($input),
-        'message' => 'Profile updated successfully'
+        'session_security_note' => ($isPasswordUpdate ?? false) ? 'Session regenerated for security' : null
     ], 'Profile updated successfully');
     
 } catch (Exception $e) {
+    // Log error using authoritative audit function
+    audit_profile_update(
+        $userId ?? null,
+        'system_error',
+        $userId ?? null,
+        'Profile update error: ' . $e->getMessage()
+    );
+    
     app_log('error', 'Profile update error: ' . $e->getMessage());
     json_fail('SERVER_ERROR', 'Failed to update profile');
 }

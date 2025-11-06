@@ -423,16 +423,40 @@
       "gate_status": "RED",
       "production_ready": false,
       "artifacts_archived": "backups/qc_post_fix_20251106_061713.zip"
+    },
+    {
+      "type": "remediation",
+      "area": "ratelimit",
+      "status": "applied",
+      "timestamp": "2025-11-06T08:09:00.000Z"
+    },
+    {
+      "type": "remediation",
+      "area": "csrf",
+      "status": "closed-6-gaps",
+      "timestamp": "2025-11-06T08:10:00.000Z"
+    },
+    {
+      "type": "remediation",
+      "area": "audit",
+      "status": "aligned-schema-code",
+      "timestamp": "2025-11-06T08:12:00.000Z"
+    },
+    {
+      "type": "remediation",
+      "area": "openapi",
+      "status": "completed",
+      "timestamp": "2025-11-06T08:13:00.000Z"
     }
   ],
   
   "upcoming": [
     {
-      "phase": "3-Integration-Blueprint",
-      "goal": "Wire existing UI to APIs (no UI change)",
-      "deps": ["api_contract >= 95%", "db_integrity pass", "audit_sanity pass"],
-      "status": "BLOCKED - All dependencies failed",
-      "blockers": ["rate limiting failures", "audit system complete failure", "security gaps", "documentation gaps"]
+      "phase": "3-integration",
+      "goal": "Wire backend to existing UI",
+      "deps": ["QC-GREEN"],
+      "status": "Ready to Begin",
+      "blockers": []
     }
   ],
   

@@ -2,6 +2,11 @@
 // register.php — send OTP, but DO NOT create user beyond 'unverified' until email is verified
 // Session and security handling centralized via bootstrap.php
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/security/ratelimit.php';
+require_once __DIR__ . '/includes/security/csrf.php';
+
+// Rate limit registration attempts: 3 per minute
+require_rate_limit('auth:register', 3);
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 function column_exists(mysqli $db, string $table, string $column): bool {
@@ -34,10 +39,18 @@ $err = '';
 $val = ['name'=>'','email'=>''];
 
 if ($_SERVER['REQUEST_METHOD']==='POST') {
-  $name = trim($_POST['name'] ?? '');
-  $email= trim($_POST['email'] ?? '');
-  $pass = (string)($_POST['password'] ?? '');
-  $conf = (string)($_POST['confirm'] ?? '');
+  // CSRF Protection - validate before any DB operations
+  if (!validate_csrf($_POST['csrf'] ?? '')) {
+    $err = 'Security verification failed. Please try again.';
+    $name = trim($_POST['name'] ?? '');
+    $email= trim($_POST['email'] ?? '');
+  } else {
+    $name = trim($_POST['name'] ?? '');
+    $email= trim($_POST['email'] ?? '');
+    $pass = (string)($_POST['password'] ?? '');
+    $conf = (string)($_POST['confirm'] ?? '');
+  }
+  
   $val['name']=$name; $val['email']=$email;
 
   if ($name===''||$email===''||$pass===''||$conf==='') {
@@ -134,6 +147,7 @@ $hideNav = true; include __DIR__ . '/header.php';
     <div style="background:#fff4f4;border:1px solid #f5c2c2;color:#7a1a1a;padding:10px;border-radius:8px;margin:12px 0"><?=h($err)?></div>
   <?php endif; ?>
   <form method="post" novalidate>
+    <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
     <label style="display:block;margin-top:10px;font-weight:600">Full name</label>
     <input name="name" value="<?=h($val['name'])?>" required
            style="width:100%;padding:12px;border:1px solid #e6e9ef;border-radius:8px">

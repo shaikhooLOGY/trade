@@ -1,0 +1,1335 @@
+openapi: 3.0.3
+info:
+  title: Shaikhoology TMS-MTM Platform API
+  description: |
+    Enterprise Trading Management System API with Phase 3 Compliance Implementation.
+    
+    ## Authentication & Authorization
+    The platform uses session-based authentication:
+    - **Session Token**: Stored in `$_SESSION['user_id']` and `$_SESSION['csrf_token']`
+    - **Admin Access**: Controlled by `$_SESSION['is_admin'] === 1`
+    - **Active User**: Requires email verification and approved status
+    
+    ## Response Format
+    All API endpoints return consistent response format:
+    ```json
+    {
+      "success": boolean,
+      "message": string,
+      "timestamp": string,
+      "data": object,
+      "meta": object,
+      "request_id": string
+    }
+    ```
+    
+    Error responses:
+    ```json
+    {
+      "success": false,
+      "code": string,
+      "message": string,
+      "timestamp": string,
+      "error_details": object,
+      "request_id": string
+    }
+    ```
+    
+    ## Phase 3 Compliance Features
+    - **Audit Trail System**: Comprehensive logging of all user actions and system events
+    - **Security Event Monitoring**: CSRF violations, rate limiting, unauthorized access attempts
+    - **Compliance Reporting**: Built-in audit log viewing and export capabilities
+    - **Data Retention Policies**: Automated cleanup of old audit events
+    - **Request Tracking**: Every API call is tracked with unique request IDs
+    
+    ## Rate Limiting
+    - **API Endpoints**: 5-10 requests per minute (session-based)
+    - **Admin Endpoints**: No rate limiting for audit log access
+    - **Audit Endpoints**: Special rate limits for compliance operations
+    
+    ## Security Features
+    - CSRF protection for all mutating operations
+    - Session-based rate limiting
+    - SQL injection protection via prepared statements
+    - Input validation and sanitization
+    - Audit logging for compliance and security monitoring
+    - Request/response tracking with unique identifiers
+    
+  version: 2.0.0
+  contact:
+    name: Shaikhoology Platform Team
+    email: support@shaikhoology.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://shaikhoology.local
+    description: Local Development Server
+  - url: https://api.shaikhoology.com
+    description: Production Server
+
+security:
+  - SessionAuth: []
+  - AdminAuth: []
+
+paths:
+  # === MTM (Model Training Management) APIs ===
+  /api/mtm/enroll:
+    post:
+      tags:
+        - MTM
+      summary: Enroll in MTM Model
+      description: |
+        Allows authenticated users to enroll in a specific MTM (Model Training Management) model at a specific tier.
+        
+        **Compliance**: Automatically logs enrollment attempts and successes for audit trail.
+        
+        **Security**: 
+        - Requires login and active user status
+        - CSRF protection enforced
+        - Rate limited: 5 requests per minute
+        
+      operationId: enrollMtmModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - model_id
+                - tier
+              properties:
+                model_id:
+                  type: integer
+                  description: ID of the MTM model to enroll in
+                  minimum: 1
+                  example: 123
+                tier:
+                  type: string
+                  description: Enrollment tier level
+                  enum: [basic, intermediate, advanced]
+                  example: basic
+      responses:
+        '200':
+          description: Enrollment successful
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - enrollment_id
+                  - unlocked_task_id
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  enrollment_id:
+                    type: integer
+                    description: Unique enrollment ID
+                    example: 456
+                  unlocked_task_id:
+                    type: integer
+                    description: First unlocked task ID in the model
+                    example: 789
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                code: VALIDATION_ERROR
+                message: "model_id must be a positive integer"
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Already enrolled in model
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                code: ALREADY_EXISTS
+                message: "Trader is already enrolled in this model"
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                code: RATE_LIMITED
+                message: "Rate limit exceeded. Try again later."
+
+  /api/mtm/enrollments:
+    get:
+      tags:
+        - MTM
+      summary: Get User MTM Enrollments
+      description: |
+        Retrieves all MTM enrollments for the authenticated trader.
+        
+        **Compliance**: Logs access to enrollment data for audit purposes.
+        
+      operationId: getMtmEnrollments
+      responses:
+        '200':
+          description: Enrollments retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MtmEnrollment'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # === Trade APIs ===
+  /api/trades/create:
+    post:
+      tags:
+        - Trades
+      summary: Create New Trade
+      description: |
+        Creates a new trade record for the authenticated trader.
+        
+        **Compliance**: Automatically logs trade creation for financial audit trail.
+        
+      operationId: createTrade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - symbol
+                - side
+                - quantity
+                - price
+                - opened_at
+              properties:
+                symbol:
+                  type: string
+                  description: Trading symbol/stock ticker
+                  maxLength: 32
+                  example: "AAPL"
+                side:
+                  type: string
+                  description: Trade direction
+                  enum: [buy, sell]
+                  example: "buy"
+                quantity:
+                  type: number
+                  description: Number of shares/units
+                  minimum: 0
+                  exclusiveMinimum: true
+                  example: 100
+                price:
+                  type: number
+                  description: Entry price per share
+                  minimum: 0
+                  exclusiveMinimum: true
+                  example: 150.25
+                opened_at:
+                  type: string
+                  format: date-time
+                  description: Trade opening timestamp
+                  example: "2025-11-05T10:30:00Z"
+                notes:
+                  type: string
+                  description: Trade notes (optional)
+                  maxLength: 1000
+                  example: "Long-term growth position"
+      responses:
+        '200':
+          description: Trade created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        description: Created trade ID
+                        example: 1001
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/trades/update:
+    post:
+    put:
+      tags:
+        - Trades
+      summary: Update Trade
+      description: |
+        Updates an existing trade record. Users can only update their own trades unless they are admin.
+        
+        **Compliance**: Logs all trade modifications for audit trail.
+        
+      operationId: updateTrade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: integer
+                  description: Trade ID to update
+                  minimum: 1
+                  example: 1001
+                symbol:
+                  type: string
+                  description: Trading symbol
+                  maxLength: 32
+                side:
+                  type: string
+                  description: Trade direction
+                  enum: [buy, sell]
+                quantity:
+                  type: number
+                  description: Number of shares
+                  minimum: 0
+                price:
+                  type: number
+                  description: Entry price
+                  minimum: 0
+                opened_at:
+                  type: string
+                  format: date-time
+                closed_at:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Trade updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden - can only update own trades
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trade not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # === Admin APIs ===
+  /api/admin/audit_log:
+    get:
+      tags:
+        - Admin
+        - Audit
+      summary: View Audit Logs
+      description: |
+        Admin endpoint for viewing and managing audit logs.
+        
+        **Security**: Requires admin privileges
+        **Rate Limiting**: Special limits for audit operations
+        **Compliance**: Essential for regulatory compliance and security monitoring
+        
+      operationId: getAuditLogs
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of results per page (max 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: event_type
+          in: query
+          description: Filter by event type
+          schema:
+            type: string
+        - name: event_category
+          in: query
+          description: Filter by event category
+          schema:
+            type: string
+            enum: [user_action, admin_action, system_event, security_event, trade_action, mtm_action, profile_action]
+        - name: user_id
+          in: query
+          description: Filter by user ID
+          schema:
+            type: integer
+        - name: severity
+          in: query
+          description: Filter by severity level
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: date_from
+          in: query
+          description: Filter from date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: Filter to date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Audit logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AuditEvent'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Admin
+        - Audit
+      summary: Audit Log Management Actions
+      description: |
+        Admin endpoint for audit log management actions (cleanup, statistics, export).
+        
+        **Security**: Requires admin privileges
+        **CSRF**: Protected against CSRF attacks
+        
+      operationId: manageAuditLogs
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: Action to perform
+          schema:
+            type: string
+            enum: [cleanup, statistics, export]
+      responses:
+        '200':
+          description: Action completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Invalid action or parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/enrollment/approve:
+    post:
+      tags:
+        - Admin
+        - MTM
+      summary: Approve MTM Enrollment
+      description: |
+        Admin endpoint to approve user enrollment in MTM models.
+        
+        **Compliance**: Logs all approval actions for audit trail.
+        
+      operationId: approveEnrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollment_id
+              properties:
+                enrollment_id:
+                  type: integer
+                  description: Enrollment ID to approve
+                  minimum: 1
+                admin_notes:
+                  type: string
+                  description: Optional admin notes
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Enrollment approved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Enrollment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/enrollment/reject:
+    post:
+      tags:
+        - Admin
+        - MTM
+      summary: Reject MTM Enrollment
+      description: |
+        Admin endpoint to reject user enrollment in MTM models.
+        
+        **Compliance**: Logs all rejection actions with reasons for audit trail.
+        
+      operationId: rejectEnrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollment_id
+              properties:
+                enrollment_id:
+                  type: integer
+                  description: Enrollment ID to reject
+                  minimum: 1
+                reason:
+                  type: string
+                  description: Reason for rejection
+                  maxLength: 1000
+                admin_notes:
+                  type: string
+                  description: Optional admin notes
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Enrollment rejected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Enrollment not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/admin/users/search:
+    get:
+      tags:
+        - Admin
+        - User Management
+      summary: Search and Manage Users
+      description: |
+        Admin endpoint for searching and managing users with detailed statistics.
+        
+        **Compliance**: Logs all admin user search activities.
+        
+      operationId: searchUsers
+      parameters:
+        - name: q
+          in: query
+          description: Search query (name, email, or display name)
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by user status
+          schema:
+            type: string
+            enum: [active, pending, suspended, banned]
+        - name: role
+          in: query
+          description: Filter by user role
+          schema:
+            type: string
+            enum: [user, admin, moderator]
+        - name: verified
+          in: query
+          description: Filter by email verification status
+          schema:
+            type: string
+            enum: [true, false]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sort
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [name, email, created_at, last_login, total_trades, total_enrollments]
+            default: name
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserWithStats'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+                      summary:
+                        type: object
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # === Profile APIs ===
+  /api/profile/update:
+    post:
+      tags:
+        - Profile
+      summary: Update User Profile
+      description: |
+        Updates the current user's profile information.
+        
+        **Compliance**: Logs all profile updates for audit trail.
+        **Security**: Requires password re-authentication for password changes.
+        
+      operationId: updateProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: User's full name
+                  minLength: 2
+                  maxLength: 100
+                display_name:
+                  type: string
+                  description: Display name
+                  maxLength: 100
+                bio:
+                  type: string
+                  description: User bio
+                  maxLength: 500
+                location:
+                  type: string
+                  description: User location
+                  maxLength: 100
+                timezone:
+                  type: string
+                  description: User timezone
+                password:
+                  type: string
+                  description: New password (requires re-authentication)
+                  minLength: 8
+                preferences:
+                  type: object
+                  description: User preferences
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      profile:
+                        $ref: '#/components/schemas/UserProfile'
+                      updated_fields:
+                        type: array
+                        items:
+                          type: string
+                      session_security_note:
+                        type: string
+                        description: Security note if session was regenerated
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Re-authentication required for password changes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  # === Utility APIs ===
+  /api/util/csrf:
+    get:
+      tags:
+        - Utility
+      summary: Get CSRF Token
+      description: |
+        Retrieves the current CSRF token for the session.
+        
+      operationId: getCsrfToken
+      responses:
+        '200':
+          description: CSRF token retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      csrf_token:
+                        type: string
+                        description: Current CSRF token from session
+                        example: "a8f5f167f44f4964e6c998dee827110c"
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    SessionAuth:
+      type: apiKey
+      in: header
+      name: PHPSESSID
+      description: PHP Session ID cookie for authentication
+    AdminAuth:
+      type: apiKey
+      in: header
+      name: PHPSESSID
+      description: PHP Session ID with admin privileges (is_admin=1)
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - code
+        - message
+        - timestamp
+        - request_id
+      properties:
+        success:
+          type: boolean
+          example: false
+        code:
+          type: string
+          description: Error code for programmatic handling
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          description: Human-readable error message
+          example: "The request contains invalid parameters"
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp in ISO 8601 format
+          example: "2025-11-06T04:31:33.498Z"
+        request_id:
+          type: string
+          description: Unique request identifier for tracking
+          example: "a1b2c3d4e5f6g7h8"
+        error_details:
+          type: object
+          description: Additional error details (optional)
+        user_id:
+          type: integer
+          description: ID of authenticated user (if applicable)
+          example: 123
+        debug:
+          type: object
+          description: Debug information (development only)
+          properties:
+            error_description:
+              type: string
+            request_uri:
+              type: string
+            request_method:
+              type: string
+            session_data:
+              type: object
+
+    SuccessResponse:
+      type: object
+      required:
+        - success
+        - message
+        - timestamp
+        - data
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          description: Success message
+          example: "Operation completed successfully"
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp in ISO 8601 format
+          example: "2025-11-06T04:31:33.498Z"
+        data:
+          type: object
+          description: Response data
+        meta:
+          type: object
+          description: Additional metadata
+        request_id:
+          type: string
+          description: Unique request identifier for tracking
+          example: "a1b2c3d4e5f6g7h8"
+        user_id:
+          type: integer
+          description: ID of authenticated user (if applicable)
+          example: 123
+
+    AuditEvent:
+      type: object
+      required:
+        - id
+        - event_type
+        - event_category
+        - description
+        - severity
+        - status
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: Unique audit event ID
+          example: 1001
+        event_type:
+          type: string
+          description: Type of audit event
+          example: "user_login"
+        event_category:
+          type: string
+          description: Category of audit event
+          enum: [user_action, admin_action, system_event, security_event, trade_action, mtm_action, profile_action]
+          example: "user_action"
+        user_id:
+          type: integer
+          description: ID of user involved in event (if applicable)
+          nullable: true
+          example: 123
+        admin_id:
+          type: integer
+          description: ID of admin user who performed action (if applicable)
+          nullable: true
+          example: 456
+        target_type:
+          type: string
+          description: Type of entity that was targeted
+          nullable: true
+          example: "trade"
+        target_id:
+          type: integer
+          description: ID of targeted entity (if applicable)
+          nullable: true
+          example: 789
+        description:
+          type: string
+          description: Human-readable description of the event
+          example: "User logged in successfully"
+        metadata:
+          type: object
+          description: Additional event metadata as JSON
+          nullable: true
+        ip_address:
+          type: string
+          description: Client IP address
+          nullable: true
+          example: "192.168.1.100"
+        user_agent:
+          type: string
+          description: Client user agent
+          nullable: true
+          example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        session_id:
+          type: string
+          description: Session identifier
+          nullable: true
+          example: "abc123def456"
+        severity:
+          type: string
+          description: Event severity level
+          enum: [low, medium, high, critical]
+          example: "low"
+        status:
+          type: string
+          description: Event status
+          enum: [success, failure, warning, pending]
+          example: "success"
+        created_at:
+          type: string
+          format: date-time
+          description: Event timestamp
+          example: "2025-11-06T04:31:33.498Z"
+        user_name:
+          type: string
+          description: Name of user involved (if available)
+          nullable: true
+        user_email:
+          type: string
+          description: Email of user involved (if available)
+          nullable: true
+        admin_name:
+          type: string
+          description: Name of admin user (if available)
+          nullable: true
+        admin_email:
+          type: string
+          description: Email of admin user (if available)
+          nullable: true
+
+    MtmEnrollment:
+      type: object
+      required:
+        - id
+        - model_id
+        - model_name
+        - tier
+        - status
+        - started_at
+      properties:
+        id:
+          type: integer
+          description: Enrollment ID
+          example: 456
+        model_id:
+          type: integer
+          description: MTM model ID
+          example: 123
+        model_name:
+          type: string
+          description: Human-readable model name
+          example: "Basic Trading Fundamentals"
+        tier:
+          type: string
+          description: Enrollment tier
+          enum: [basic, intermediate, advanced]
+          example: basic
+        status:
+          type: string
+          description: Enrollment status
+          enum: [pending, approved, active, completed, archived]
+          example: approved
+        started_at:
+          type: string
+          format: date-time
+          description: Enrollment start date
+          example: "2025-11-01T10:00:00Z"
+
+    Trade:
+      type: object
+      required:
+        - id
+        - symbol
+        - side
+        - quantity
+        - price
+        - opened_at
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: Unique trade ID
+          example: 1001
+        symbol:
+          type: string
+          description: Trading symbol/stock ticker
+          example: "AAPL"
+        side:
+          type: string
+          description: Trade direction
+          enum: [buy, sell]
+          example: "buy"
+        quantity:
+          type: number
+          description: Number of shares/units
+          example: 100
+        price:
+          type: number
+          description: Entry price per share
+          example: 150.25
+        opened_at:
+          type: string
+          format: date-time
+          description: Trade opening timestamp
+          example: "2025-11-05T10:30:00Z"
+        closed_at:
+          type: string
+          format: date-time
+          description: Trade closing timestamp (if closed)
+          nullable: true
+          example: "2025-11-05T14:45:00Z"
+        notes:
+          type: string
+          description: Trade notes and analysis
+          nullable: true
+          example: "Long-term growth position based on quarterly earnings"
+        created_at:
+          type: string
+          format: date-time
+          description: Trade creation timestamp
+          example: "2025-11-05T10:30:00Z"
+
+    Pagination:
+      type: object
+      required:
+        - current_page
+        - per_page
+        - total_items
+        - total_pages
+        - has_next
+        - has_previous
+      properties:
+        current_page:
+          type: integer
+          description: Current page number
+          example: 1
+        per_page:
+          type: integer
+          description: Number of items per page
+          example: 50
+        total_items:
+          type: integer
+          description: Total number of items
+          example: 150
+        total_pages:
+          type: integer
+          description: Total number of pages
+          example: 3
+        has_next:
+          type: boolean
+          description: Whether there are more pages
+          example: true
+        has_previous:
+          type: boolean
+          description: Whether there are previous pages
+          example: false
+
+    UserWithStats:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            profile_completion_score:
+              type: integer
+              description: Profile completion percentage
+              example: 85
+            location:
+              type: string
+              description: User location
+              nullable: true
+            timezone:
+              type: string
+              description: User timezone
+              nullable: true
+            bio:
+              type: string
+              description: User bio
+              nullable: true
+            stats:
+              type: object
+              properties:
+                total_trades:
+                  type: integer
+                  description: Total number of trades
+                  example: 25
+                total_enrollments:
+                  type: integer
+                  description: Total number of MTM enrollments
+                  example: 3
+                approved_enrollments:
+                  type: integer
+                  description: Number of approved enrollments
+                  example: 2
+                pending_enrollments:
+                  type: integer
+                  description: Number of pending enrollments
+                  example: 1
+                recent_trades_30d:
+                  type: integer
+                  description: Number of trades in last 30 days
+                  example: 5
+            activity_level:
+              type: string
+              description: User activity level based on recent trades
+              enum: [low, medium, high]
+              example: "medium"
+            admin_actions:
+              type: array
+              items:
+                type: string
+              description: Available admin actions for this user
+              example: ["approve", "reject", "suspend"]
+
+    User:
+      type: object
+      required:
+        - id
+        - email
+        - name
+        - status
+      properties:
+        id:
+          type: integer
+          description: User ID
+          example: 123
+        name:
+          type: string
+          description: User's full name
+          example: "John Doe"
+        display_name:
+          type: string
+          description: User's display name
+          nullable: true
+          example: "Johnny"
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "john.doe@example.com"
+        status:
+          type: string
+          description: Account status
+          enum: [pending, active, suspended, banned]
+          example: "active"
+        role:
+          type: string
+          description: User role
+          enum: [user, admin, moderator]
+          example: "user"
+        email_verified:
+          type: boolean
+          description: Whether email has been verified
+          example: true
+        created_at:
+          type: string
+          format: date-time
+          description: Account creation date
+          example: "2025-01-15T08:00:00Z"
+        last_login:
+          type: string
+          format: date-time
+          description: Last login timestamp
+          nullable: true
+          example: "2025-11-05T14:30:00Z"
+
+    UserProfile:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            preferences:
+              type: object
+              description: User preferences as JSON object
+              additionalProperties: true
+              nullable: true
+            profile_completion_score:
+              type: integer
+              description: Profile completion percentage
+              example: 90
+
+tags:
+  - name: MTM
+    description: Model Training Management APIs with audit trail compliance
+  - name: Trades
+    description: Trade management operations with financial audit logging
+  - name: Admin
+    description: Administrative functions with comprehensive audit logging
+  - name: Profile
+    description: User profile management with security audit trails
+  - name: Utility
+    description: Utility functions and helper endpoints
+  - name: Audit
+    description: Compliance and audit trail management endpoints
+  - name: User Management
+    description: Admin user management operations with audit logging
+
+externalDocs:
+  description: Phase 3 Compliance Implementation Guide
+  url: https://docs.shaikhoology.com/compliance

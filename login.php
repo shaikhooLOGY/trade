@@ -1,6 +1,11 @@
 <?php
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/includes/bootstrap.php';
+require_once __DIR__ . '/includes/security/ratelimit.php';
+require_once __DIR__ . '/includes/security/csrf.php';
+
+// Rate limit login attempts: 8 per minute
+require_rate_limit('auth:login', 8);
 
 function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
@@ -32,47 +37,53 @@ if (!empty($_SESSION['user_id'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $email = trim($_POST['email'] ?? '');
-  $pass  = (string)($_POST['password'] ?? '');
-  if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $pass==='') {
-    $err = 'Please enter a valid email and password.';
+  // CSRF Protection - validate before any authentication operations
+  if (!validate_csrf($_POST['csrf'] ?? '')) {
+    $err = 'Security verification failed. Please try again.';
   } else {
-    if ($st = $mysqli->prepare("SELECT id,name,email,password_hash,is_admin,status,email_verified,role FROM users WHERE email=? LIMIT 1")) {
-      $st->bind_param('s',$email);
-      $st->execute();
-      $u = $st->get_result()->fetch_assoc();
-      $st->close();
-
-      if ($u && password_verify($pass, $u['password_hash'])) {
-        // set session
-        $_SESSION['user_id']        = (int)$u['id'];
-        $_SESSION['username']       = $u['name'] ?: $u['email'];
-        $_SESSION['email']          = $u['email'];
-        $_SESSION['is_admin']       = (int)$u['is_admin'];
-        $_SESSION['status']         = $u['status'];
-        $_SESSION['email_verified'] = (int)$u['email_verified'];
-        $_SESSION['role']           = $u['role'] ?: (($u['is_admin'] ?? 0) ? 'admin' : 'user');
-
-        // Strict routing
-        $isAdmin = (int)$u['is_admin'];
-        $verified = (int)$u['email_verified'];
-        $status = strtolower((string)$u['status']);
-
-        if ($isAdmin !== 1 && $verified !== 1) {
-          header('Location: /verify_profile.php?email=' . urlencode($u['email']));
-          exit;
-        }
-        if (in_array($status, ['active','approved'], true)) {
-          header('Location: ' . ($isAdmin ? '/admin/admin_dashboard.php' : '/dashboard.php'));
-          exit;
-        }
-        header('Location: /pending_approval.php');
-        exit;
-      } else {
-        $err = 'Invalid email or password.';
-      }
+    $email = trim($_POST['email'] ?? '');
+    $pass  = (string)($_POST['password'] ?? '');
+    
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $pass==='') {
+      $err = 'Please enter a valid email and password.';
     } else {
-      $err = 'Database error: '.$mysqli->error;
+      if ($st = $mysqli->prepare("SELECT id,name,email,password_hash,is_admin,status,email_verified,role FROM users WHERE email=? LIMIT 1")) {
+        $st->bind_param('s',$email);
+        $st->execute();
+        $u = $st->get_result()->fetch_assoc();
+        $st->close();
+
+        if ($u && password_verify($pass, $u['password_hash'])) {
+          // set session
+          $_SESSION['user_id']        = (int)$u['id'];
+          $_SESSION['username']       = $u['name'] ?: $u['email'];
+          $_SESSION['email']          = $u['email'];
+          $_SESSION['is_admin']       = (int)$u['is_admin'];
+          $_SESSION['status']         = $u['status'];
+          $_SESSION['email_verified'] = (int)$u['email_verified'];
+          $_SESSION['role']           = $u['role'] ?: (($u['is_admin'] ?? 0) ? 'admin' : 'user');
+
+          // Strict routing
+          $isAdmin = (int)$u['is_admin'];
+          $verified = (int)$u['email_verified'];
+          $status = strtolower((string)$u['status']);
+
+          if ($isAdmin !== 1 && $verified !== 1) {
+            header('Location: /verify_profile.php?email=' . urlencode($u['email']));
+            exit;
+          }
+          if (in_array($status, ['active','approved'], true)) {
+            header('Location: ' . ($isAdmin ? '/admin/admin_dashboard.php' : '/dashboard.php'));
+            exit;
+          }
+          header('Location: /pending_approval.php');
+          exit;
+        } else {
+          $err = 'Invalid email or password.';
+        }
+      } else {
+        $err = 'Database error: '.$mysqli->error;
+      }
     }
   }
 }
@@ -104,6 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <h2 style="margin:0 0 10px">🔐 Login</h2>
     <?php if ($err): ?><div class="err"><?=h($err)?></div><?php endif; ?>
     <form method="post" novalidate>
+      <input type="hidden" name="csrf" value="<?= htmlspecialchars(get_csrf_token()) ?>">
       <label style="display:block;margin-top:10px;font-weight:600">Email</label>
       <input type="email" name="email" required value="<?=h($email)?>">
       <label style="display:block;margin-top:12px;font-weight:600">Password</label>

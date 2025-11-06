@@ -1,48 +1,69 @@
 openapi: 3.0.3
 info:
-  title: PHP Trading Platform API
+  title: Shaikhoology TMS-MTM Platform API
   description: |
-    Comprehensive API documentation for a PHP-based trading platform with MTM (Model Training Management) system.
+    Enterprise Trading Management System API with Phase 3 Compliance Implementation.
     
-    ## Authentication
+    ## Authentication & Authorization
     The platform uses session-based authentication:
     - **Session Token**: Stored in `$_SESSION['user_id']` and `$_SESSION['csrf_token']`
     - **Admin Access**: Controlled by `$_SESSION['is_admin'] === 1`
     - **Active User**: Requires email verification and approved status
     
     ## Response Format
-    All API endpoints return consistent response format:
+    All API endpoints return consistent response envelope:
     ```json
     {
       "success": boolean,
-      "code": string,
-      "message": string,
-      "details": object?
+      "data": object,
+      "message": "string",
+      "error": "string|null"
     }
     ```
     
+    Error responses:
+    ```json
+    {
+      "success": false,
+      "data": null,
+      "message": "string",
+      "error": "string|null"
+    }
+    ```
+    
+    ## Phase 3 Compliance Features
+    - **Audit Trail System**: Comprehensive logging of all user actions and system events
+    - **Security Event Monitoring**: CSRF violations, rate limiting, unauthorized access attempts
+    - **Compliance Reporting**: Built-in audit log viewing and export capabilities
+    - **Data Retention Policies**: Automated cleanup of old audit events
+    - **Request Tracking**: Every API call is tracked with unique request IDs
+    
     ## Rate Limiting
     - **API Endpoints**: 5-10 requests per minute (session-based)
-    - **Admin Endpoints**: No rate limiting (security concern)
+    - **Admin Endpoints**: No rate limiting for audit log access
+    - **Audit Endpoints**: Special rate limits for compliance operations
+    - **Rate Limit Errors**: Return 429 status with proper retry headers
     
     ## Security Features
-    - CSRF protection for admin and select API endpoints
+    - CSRF protection for all mutating operations
     - Session-based rate limiting
     - SQL injection protection via prepared statements
     - Input validation and sanitization
+    - Audit logging for compliance and security monitoring
+    - Request/response tracking with unique identifiers
     
-  version: 1.0.0
+  version: 2.1.0
   contact:
-    name: API Support
-    email: support@tradingplatform.com
+    name: Shaikhoology Platform Team
+    email: support@shaikhoology.com
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
 
 servers:
-  - url: https://tradingplatform.local
+  - url: https://shaikhoology.local
     description: Local Development Server
-  - url: https://api.tradingplatform.com
+  - url: https://api.shaikhoology.com
     description: Production Server
 
 security:
@@ -50,6 +71,417 @@ security:
   - AdminAuth: []
 
 paths:
+  # === Health Check ===
+  /api/health.php:
+    get:
+      tags:
+        - Health
+      summary: Health Check
+      description: |
+        Environment-based health monitoring endpoint.
+        
+        **Note**: Returns 200 only when APP_ENV=local; otherwise 404.
+        Available only in local development environment.
+        
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Health status OK (local environment only)
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        example: "ok"
+                      app_env:
+                        type: string
+                        example: "local"
+                      time:
+                        type: string
+                        format: date-time
+                  message:
+                    type: string
+                    example: "Health check successful"
+                  error:
+                    type: "null"
+        '404':
+          description: Feature disabled (production environment)
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                    example: "Health endpoint available only in local environment"
+                  error:
+                    type: string
+                    example: "FEATURE_OFF"
+
+  # === Dashboard APIs ===
+  /api/dashboard/index.php:
+    get:
+      tags:
+        - Dashboard
+      summary: Dashboard Router
+      description: |
+        Routes requests to appropriate dashboard endpoints and returns available options.
+        
+        **Compliance**: Logs dashboard access for user activity tracking.
+        
+      operationId: dashboardRouter
+      responses:
+        '200':
+          description: Dashboard router response
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      message:
+                        type: string
+                      endpoints:
+                        type: object
+                      user_id:
+                        type: integer
+                      timestamp:
+                        type: string
+                        format: date-time
+                  message:
+                    type: string
+                    example: "Dashboard API available"
+                  error:
+                    type: "null"
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                    example: "Rate limit exceeded. Try again later."
+                  error:
+                    type: string
+                    example: "RATE_LIMITED"
+
+  /api/dashboard/metrics.php:
+    get:
+      tags:
+        - Dashboard
+      summary: Get Dashboard Metrics
+      description: |
+        Comprehensive dashboard metrics including trade statistics, MTM model counts, and performance trends.
+        
+        **Compliance**: Logs dashboard metrics access for performance monitoring.
+        
+      operationId: getDashboardMetrics
+      responses:
+        '200':
+          description: Dashboard metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      total_trades:
+                        type: integer
+                      win_rate:
+                        type: number
+                        format: float
+                      total_pnl:
+                        type: number
+                        format: float
+                      active_models:
+                        type: integer
+                      pending_approvals:
+                        type: integer
+                      performance_trend:
+                        type: array
+                        items:
+                          type: object
+                      recent_trades:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Trade'
+                  message:
+                    type: string
+                    example: "Dashboard metrics retrieved successfully"
+                  error:
+                    type: "null"
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                    example: "Rate limit exceeded. Try again later."
+                  error:
+                    type: string
+                    example: "RATE_LIMITED"
+
+  /api/dashboard/m:
+    get:
+      tags:
+        - Dashboard
+      summary: Get Range-based Dashboard Metrics
+      description: |
+        Dedicated metrics endpoint for range-based dashboard data.
+        
+        Handles URL patterns like: /m:30-30, /m:35-35, /m:246-246
+        
+        **Compliance**: Logs range-based metrics access for performance monitoring.
+        
+      operationId: getDashboardMetricsRange
+      parameters:
+        - name: range
+          in: path
+          required: true
+          description: Range pattern in m:XX-YY format
+          schema:
+            type: string
+            pattern: '^m:\d+-\d+$'
+            example: "m:30-30"
+      responses:
+        '200':
+          description: Range-based metrics retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      range:
+                        type: object
+                        properties:
+                          from:
+                            type: integer
+                          to:
+                            type: integer
+                      metrics:
+                        type: array
+                        items:
+                          type: object
+                      pagination:
+                        type: object
+                      timestamp:
+                        type: string
+                        format: date-time
+                      user_id:
+                        type: integer
+                  message:
+                    type: string
+                    example: "Metrics for range retrieved successfully"
+                  error:
+                    type: "null"
+        '400':
+          description: Invalid range format
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                    example: "Rate limit exceeded. Try again later."
+                  error:
+                    type: string
+                    example: "RATE_LIMITED"
+
   # === MTM (Model Training Management) APIs ===
   /api/mtm/enroll:
     post:
@@ -59,14 +491,12 @@ paths:
       description: |
         Allows authenticated users to enroll in a specific MTM (Model Training Management) model at a specific tier.
         
+        **Compliance**: Automatically logs enrollment attempts and successes for audit trail.
+        
         **Security**: 
         - Requires login and active user status
         - CSRF protection enforced
         - Rate limited: 5 requests per minute
-        
-        **Body**: 
-        - JSON input with model_id, tier, and CSRF token
-        - Validates tier must be basic, intermediate, or advanced
         
       operationId: enrollMtmModel
       requestBody:
@@ -78,7 +508,6 @@ paths:
               required:
                 - model_id
                 - tier
-                - csrf_token
               properties:
                 model_id:
                   type: integer
@@ -90,10 +519,6 @@ paths:
                   description: Enrollment tier level
                   enum: [basic, intermediate, advanced]
                   example: basic
-                csrf_token:
-                  type: string
-                  description: CSRF protection token from session
-                  example: "a8f5f167f44f4964e6c998dee827110c"
       responses:
         '200':
           description: Enrollment successful
@@ -103,56 +528,115 @@ paths:
                 type: object
                 required:
                   - success
-                  - enrollment_id
-                  - unlocked_task_id
+                  - data
+                  - message
+                  - error
                 properties:
                   success:
                     type: boolean
                     example: true
-                  enrollment_id:
-                    type: integer
-                    description: Unique enrollment ID
-                    example: 456
-                  unlocked_task_id:
-                    type: integer
-                    description: First unlocked task ID in the model
-                    example: 789
+                  data:
+                    type: object
+                    properties:
+                      enrollment_id:
+                        type: integer
+                        description: Unique enrollment ID
+                        example: 456
+                      unlocked_task_id:
+                        type: integer
+                        description: First unlocked task ID in the model
+                        example: 789
+                  message:
+                    type: string
+                    example: "Successfully enrolled in MTM model"
+                  error:
+                    type: "null"
         '400':
           description: Validation error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                success: false
-                code: VALIDATION_ERROR
-                message: "model_id must be a positive integer"
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
         '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
         '409':
           description: Already enrolled in model
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                success: false
-                code: ALREADY_ENROLLED
-                message: "Trader is already enrolled in this model"
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
         '429':
           description: Rate limit exceeded
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                success: false
-                error: "Rate limit exceeded. Try again later."
-                retry_after: 60
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                    example: "Rate limit exceeded. Try again later."
+                  error:
+                    type: string
+                    example: "RATE_LIMITED"
 
   /api/mtm/enrollments:
     get:
@@ -162,11 +646,7 @@ paths:
       description: |
         Retrieves all MTM enrollments for the authenticated trader.
         
-        **Security**: 
-        - Requires login and active user status
-        - Rate limited: 10 requests per minute
-        
-        **Query Parameters**: None required
+        **Compliance**: Logs access to enrollment data for audit purposes.
         
       operationId: getMtmEnrollments
       responses:
@@ -178,33 +658,87 @@ paths:
                 type: object
                 required:
                   - success
-                  - items
+                  - data
+                  - message
+                  - error
                 properties:
                   success:
                     type: boolean
                     example: true
-                  items:
+                  data:
                     type: array
                     items:
                       $ref: '#/components/schemas/MtmEnrollment'
+                  message:
+                    type: string
+                    example: "MTM enrollments retrieved successfully"
+                  error:
+                    type: "null"
         '400':
           description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
         '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
         '429':
           description: Rate limit exceeded
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                    example: "Rate limit exceeded. Try again later."
+                  error:
+                    type: string
+                    example: "RATE_LIMITED"
 
   # === Trade APIs ===
   /api/trades/create:
@@ -215,14 +749,7 @@ paths:
       description: |
         Creates a new trade record for the authenticated trader.
         
-        **Security**: 
-        - Requires login and active user status
-        - Input validation and sanitization
-        - Rate limited: 10 requests per minute
-        
-        **Body**: 
-        - JSON input with trade details
-        - Validates symbol, side (buy/sell), quantity, price, and opened_at date
+        **Compliance**: Automatically logs trade creation for financial audit trail.
         
       operationId: createTrade
       requestBody:
@@ -279,59 +806,250 @@ paths:
                 type: object
                 required:
                   - success
-                  - id
+                  - data
+                  - message
+                  - error
                 properties:
                   success:
                     type: boolean
                     example: true
-                  id:
-                    type: integer
-                    description: Created trade ID
-                    example: 1001
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        description: Created trade ID
+                        example: 1001
+                  message:
+                    type: string
+                    example: "Trade created successfully"
+                  error:
+                    type: "null"
         '400':
           description: Validation error
           content:
             application/json:
               schema:
                 type: object
-                allOf:
-                  - $ref: '#/components/schemas/ErrorResponse'
-                  - type: object
-                    properties:
-                      errors:
-                        type: object
-                        description: Field-specific validation errors
-                        example:
-                          symbol: "Symbol is required"
-                          quantity: "Quantity must be greater than zero"
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
         '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
         '429':
           description: Rate limit exceeded
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                    example: "Rate limit exceeded. Try again later."
+                  error:
+                    type: string
+                    example: "RATE_LIMITED"
 
-  /api/trades/list:
+  /api/trades/get.php:
+    get:
+      tags:
+        - Trades
+      summary: Get Single Trade
+      description: |
+        Get a single trade by ID (owner or admin only).
+        
+        **Compliance**: Logs trade access for audit trail.
+        
+      operationId: getTrade
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: Trade ID to retrieve
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: Trade retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    $ref: '#/components/schemas/Trade'
+                  message:
+                    type: string
+                    example: "Trade retrieved successfully"
+                  error:
+                    type: "null"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '403':
+          description: Forbidden - can only view own trades
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '404':
+          description: Trade not found
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                    example: "Rate limit exceeded. Try again later."
+                  error:
+                    type: string
+                    example: "RATE_LIMITED"
+
+  /api/trades/list.php:
     get:
       tags:
         - Trades
       summary: List User Trades
       description: |
-        Retrieves trade history for the authenticated trader with optional filtering.
+        Get trade history for the authenticated trader with optional filtering.
         
-        **Security**: 
-        - Requires login and active user status
-        - Rate limited: 10 requests per minute
-        
-        **Query Parameters**:
-        - Optional filtering by symbol, date range
-        - Pagination support with limit/offset
+        **Compliance**: Logs trade list access for audit trail.
         
       operationId: listTrades
       parameters:
@@ -340,36 +1058,33 @@ paths:
           description: Filter by trading symbol
           schema:
             type: string
-            maxLength: 32
         - name: from
           in: query
           description: Filter trades from date (YYYY-MM-DD)
           schema:
             type: string
             format: date
-            example: "2025-01-01"
         - name: to
           in: query
           description: Filter trades to date (YYYY-MM-DD)
           schema:
             type: string
             format: date
-            example: "2025-12-31"
-        - name: limit
+        - name: page
           in: query
-          description: Number of trades to return (max 200)
+          description: Page number for pagination
           schema:
             type: integer
             minimum: 1
-            maximum: 200
-            default: 50
-        - name: offset
+            default: 1
+        - name: limit
           in: query
-          description: Number of trades to skip
+          description: Number of results per page
           schema:
             type: integer
-            minimum: 0
-            default: 0
+            minimum: 1
+            maximum: 100
+            default: 20
       responses:
         '200':
           description: Trades retrieved successfully
@@ -379,48 +1094,1280 @@ paths:
                 type: object
                 required:
                   - success
-                  - items
-                  - pagination
-                  - filters
+                  - data
+                  - message
+                  - error
                 properties:
                   success:
                     type: boolean
                     example: true
-                  items:
+                  data:
                     type: array
                     items:
                       $ref: '#/components/schemas/Trade'
-                  pagination:
-                    $ref: '#/components/schemas/Pagination'
-                  filters:
-                    type: object
-                    properties:
-                      symbol:
-                        type: string
-                      from:
-                        type: string
-                        format: date
-                      to:
-                        type: string
-                        format: date
+                  message:
+                    type: string
+                    example: "Trades retrieved successfully"
+                  error:
+                    type: "null"
         '400':
-          description: Invalid query parameters
+          description: Invalid request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
         '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
         '429':
           description: Rate limit exceeded
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                    example: "Rate limit exceeded. Try again later."
+                  error:
+                    type: string
+                    example: "RATE_LIMITED"
+
+  /api/trades/update:
+    post:
+      tags:
+        - Trades
+      summary: Update Trade
+      description: |
+        Updates an existing trade record. Users can only update their own trades unless they are admin.
+        
+        **Compliance**: Logs all trade modifications for audit trail.
+        
+      operationId: updateTrade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: integer
+                  description: Trade ID to update
+                  minimum: 1
+                  example: 1001
+                symbol:
+                  type: string
+                  description: Trading symbol
+                  maxLength: 32
+                side:
+                  type: string
+                  description: Trade direction
+                  enum: [buy, sell]
+                quantity:
+                  type: number
+                  description: Number of shares
+                  minimum: 0
+                price:
+                  type: number
+                  description: Entry price
+                  minimum: 0
+                opened_at:
+                  type: string
+                  format: date-time
+                closed_at:
+                  type: string
+                  format: date-time
+                notes:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Trade updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                  message:
+                    type: string
+                    example: "Trade updated successfully"
+                  error:
+                    type: "null"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '403':
+          description: Forbidden - can only update own trades
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '404':
+          description: Trade not found
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  /api/trades/delete:
+    delete:
+      tags:
+        - Trades
+      summary: Delete Trade
+      description: |
+        Delete a trade record (owner or admin only). Prevents deletion of trades that are part of MTM enrollments.
+        
+        **Compliance**: Logs trade deletion with authoritative audit trail.
+        
+      operationId: deleteTrade
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: integer
+                  description: Trade ID to delete
+                  minimum: 1
+                  example: 1001
+      responses:
+        '200':
+          description: Trade deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                      deleted:
+                        type: boolean
+                        example: true
+                  message:
+                    type: string
+                    example: "Trade deleted successfully"
+                  error:
+                    type: "null"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '403':
+          description: Forbidden - can only delete own trades or trade part of enrollment
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '404':
+          description: Trade not found
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                    example: "Rate limit exceeded. Try again later."
+                  error:
+                    type: string
+                    example: "RATE_LIMITED"
+
+  # === Admin APIs ===
+  /api/admin/audit_log:
+    get:
+      tags:
+        - Admin
+        - Audit
+      summary: View Audit Logs
+      description: |
+        Admin endpoint for viewing and managing audit logs.
+        
+        **Security**: Requires admin privileges
+        **Rate Limiting**: Special limits for audit operations
+        **Compliance**: Essential for regulatory compliance and security monitoring
+        
+      operationId: getAuditLogs
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of results per page (max 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: event_type
+          in: query
+          description: Filter by event type
+          schema:
+            type: string
+        - name: event_category
+          in: query
+          description: Filter by event category
+          schema:
+            type: string
+            enum: [user_action, admin_action, system_event, security_event, trade_action, mtm_action, profile_action]
+        - name: user_id
+          in: query
+          description: Filter by user ID
+          schema:
+            type: integer
+        - name: severity
+          in: query
+          description: Filter by severity level
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: date_from
+          in: query
+          description: Filter from date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: date_to
+          in: query
+          description: Filter to date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Audit logs retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      events:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AuditEvent'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+                  message:
+                    type: string
+                    example: "Audit logs retrieved successfully"
+                  error:
+                    type: "null"
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+    post:
+      tags:
+        - Admin
+        - Audit
+      summary: Audit Log Management Actions
+      description: |
+        Admin endpoint for audit log management actions (cleanup, statistics, export).
+        
+        **Security**: Requires admin privileges
+        **CSRF**: Protected against CSRF attacks
+        
+      operationId: manageAuditLogs
+      parameters:
+        - name: action
+          in: query
+          required: true
+          description: Action to perform
+          schema:
+            type: string
+            enum: [cleanup, statistics, export]
+      responses:
+        '200':
+          description: Action completed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                  message:
+                    type: string
+                    example: "Audit log action completed successfully"
+                  error:
+                    type: "null"
+        '400':
+          description: Invalid action or parameters
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  /api/admin/participants.php:
+    get:
+      tags:
+        - Admin
+        - MTM
+      summary: Get MTM Enrollment Participants
+      description: |
+        Admin endpoint for viewing MTM enrollment participants with detailed statistics.
+        
+        **Security**: Requires admin privileges
+        **Compliance**: Logs admin participant access for audit trail
+        
+      operationId: getParticipants
+      parameters:
+        - name: model_id
+          in: query
+          description: Filter by specific MTM model ID
+          schema:
+            type: integer
+        - name: status
+          in: query
+          description: Filter by enrollment status
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of results per page (max 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Participants retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      participants:
+                        type: array
+                        items:
+                          type: object
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+                      filters_applied:
+                        type: object
+                      summary:
+                        type: object
+                  message:
+                    type: string
+                    example: "Participants retrieved successfully"
+                  error:
+                    type: "null"
+        '400':
+          description: Invalid parameters
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  /api/admin/enrollment/approve:
+    post:
+      tags:
+        - Admin
+        - MTM
+      summary: Approve MTM Enrollment
+      description: |
+        Admin endpoint to approve user enrollment in MTM models.
+        
+        **Compliance**: Logs all approval actions for audit trail.
+        
+      operationId: approveEnrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollment_id
+              properties:
+                enrollment_id:
+                  type: integer
+                  description: Enrollment ID to approve
+                  minimum: 1
+                admin_notes:
+                  type: string
+                  description: Optional admin notes
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Enrollment approved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      enrollment_id:
+                        type: integer
+                  message:
+                    type: string
+                    example: "Enrollment approved successfully"
+                  error:
+                    type: "null"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '404':
+          description: Enrollment not found
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  /api/admin/enrollment/reject:
+    post:
+      tags:
+        - Admin
+        - MTM
+      summary: Reject MTM Enrollment
+      description: |
+        Admin endpoint to reject user enrollment in MTM models.
+        
+        **Compliance**: Logs all rejection actions with reasons for audit trail.
+        
+      operationId: rejectEnrollment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - enrollment_id
+                - reason
+              properties:
+                enrollment_id:
+                  type: integer
+                  description: Enrollment ID to reject
+                  minimum: 1
+                reason:
+                  type: string
+                  description: Reason for rejection
+                  maxLength: 1000
+                admin_notes:
+                  type: string
+                  description: Optional admin notes
+                  maxLength: 1000
+      responses:
+        '200':
+          description: Enrollment rejected successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      enrollment_id:
+                        type: integer
+                  message:
+                    type: string
+                    example: "Enrollment rejected successfully"
+                  error:
+                    type: "null"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '404':
+          description: Enrollment not found
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  /api/admin/users/search:
+    get:
+      tags:
+        - Admin
+        - User Management
+      summary: Search and Manage Users
+      description: |
+        Admin endpoint for searching and managing users with detailed statistics.
+        
+        **Compliance**: Logs all admin user search activities.
+        
+      operationId: searchUsers
+      parameters:
+        - name: q
+          in: query
+          description: Search query (name, email, or display name)
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by user status
+          schema:
+            type: string
+            enum: [active, pending, suspended, banned]
+        - name: role
+          in: query
+          description: Filter by user role
+          schema:
+            type: string
+            enum: [user, admin, moderator]
+        - name: verified
+          in: query
+          description: Filter by email verification status
+          schema:
+            type: string
+            enum: [true, false]
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: sort
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [name, email, created_at, last_login, total_trades, total_enrollments]
+            default: name
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: ASC
+      responses:
+        '200':
+          description: Users retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      users:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/UserWithStats'
+                      pagination:
+                        $ref: '#/components/schemas/Pagination'
+                      summary:
+                        type: object
+                  message:
+                    type: string
+                    example: "Users retrieved successfully"
+                  error:
+                    type: "null"
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  # === Profile APIs ===
+  /api/profile/me.php:
+    get:
+      tags:
+        - Profile
+      summary: Get Current User Profile
+      description: |
+        Retrieves the current user's profile with comprehensive statistics.
+        
+        **Compliance**: Logs profile access for audit trail.
+        
+      operationId: getCurrentProfile
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/UserProfile'
+                      - type: object
+                        properties:
+                          statistics:
+                            type: object
+                            properties:
+                              trades:
+                                type: object
+                              enrollments:
+                                type: object
+                  message:
+                    type: string
+                    example: "Profile retrieved successfully"
+                  error:
+                    type: "null"
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+
+  /api/profile/update:
+    post:
+      tags:
+        - Profile
+      summary: Update User Profile
+      description: |
+        Updates the current user's profile information.
+        
+        **Compliance**: Logs all profile updates for audit trail.
+        **Security**: Requires password re-authentication for password changes.
+        
+      operationId: updateProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: User's full name
+                  minLength: 2
+                  maxLength: 100
+                display_name:
+                  type: string
+                  description: Display name
+                  maxLength: 100
+                bio:
+                  type: string
+                  description: User bio
+                  maxLength: 500
+                location:
+                  type: string
+                  description: User location
+                  maxLength: 100
+                timezone:
+                  type: string
+                  description: User timezone
+                password:
+                  type: string
+                  description: New password (requires re-authentication)
+                  minLength: 8
+                preferences:
+                  type: object
+                  description: User preferences
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      profile:
+                        $ref: '#/components/schemas/UserProfile'
+                      updated_fields:
+                        type: array
+                        items:
+                          type: string
+                      session_security_note:
+                        type: string
+                        description: Security note if session was regenerated
+                  message:
+                    type: string
+                    example: "Profile updated successfully"
+                  error:
+                    type: "null"
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
+        '403':
+          description: Re-authentication required for password changes
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
 
   # === Utility APIs ===
   /api/util/csrf:
@@ -431,10 +2378,6 @@ paths:
       description: |
         Retrieves the current CSRF token for the session.
         
-        **Security**: 
-        - Requires login
-        - No rate limiting
-        
       operationId: getCsrfToken
       responses:
         '200':
@@ -444,387 +2387,47 @@ paths:
               schema:
                 type: object
                 required:
-                  - csrf_token
+                  - success
+                  - data
+                  - message
+                  - error
                 properties:
-                  csrf_token:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      csrf_token:
+                        type: string
+                        description: Current CSRF token from session
+                        example: "a8f5f167f44f4964e6c998dee827110c"
+                  message:
                     type: string
-                    description: Current CSRF token from session
-                    example: "a8f5f167f44f4964e6c998dee827110c"
+                    example: "CSRF token retrieved successfully"
+                  error:
+                    type: "null"
         '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
-  # === Admin User Management ===
-  /admin/user_action:
-    post:
-      tags:
-        - Admin
-        - User Management
-      summary: Admin User Actions
-      description: |
-        Centralized endpoint for admin user management actions.
-        
-        **Security**: 
-        - Requires admin privileges (is_admin = 1)
-        - CSRF protection enforced
-        - No rate limiting (security concern)
-        
-        **Actions Available**:
-        - approve: Activate user account
-        - send_back: Request user profile updates
-        - send_back_detail: Detailed field-level feedback
-        - reject: Permanently reject user
-        - activate: Re-activate rejected user
-        - promote: Grant admin privileges
-        - demote: Remove admin privileges
-        - delete: Permanently delete user
-        
-      operationId: adminUserAction
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required:
-                - id
-                - action
-                - csrf
-              properties:
-                id:
-                  type: integer
-                  description: Target user ID
-                  minimum: 1
-                action:
-                  type: string
-                  description: Action to perform
-                  enum: [approve, send_back, send_back_detail, reject, activate, promote, demote, delete]
-                csrf:
-                  type: string
-                  description: Admin CSRF token
-                reason:
-                  type: string
-                  description: Reason for actions (required for send_back, reject)
-      responses:
-        '302':
-          description: Action completed - redirects to users.php with flash message
-        '400':
-          description: Invalid request
-        '403':
-          description: Admin access required
-        '500':
-          description: Database or server error
-
-  # === Dashboard Trade Actions ===
-  /dashboard:
-    post:
-      tags:
-        - Dashboard
-        - Trades
-      summary: Dashboard Trade Actions
-      description: |
-        Handles trade actions from the main dashboard.
-        
-        **Security**: 
-        - Requires login
-        - CSRF protection for state-changing operations
-        
-        **Actions**:
-        - soft_delete: Soft delete trade (sets deleted_at timestamp)
-        
-      operationId: dashboardTradeAction
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              required:
-                - csrf
-                - action
-              properties:
-                csrf:
-                  type: string
-                  description: Session CSRF token
-                action:
-                  type: string
-                  description: Action to perform
-                  enum: [soft_delete]
-                trade_id:
-                  type: integer
-                  description: Target trade ID (required for soft_delete)
-      responses:
-        '302':
-          description: Action completed - redirects to dashboard
-        '400':
-          description: Invalid request or CSRF validation failed
-
-  # === User Profile Management ===
-  /profile:
-    get:
-      tags:
-        - Profile
-      summary: View User Profile
-      description: |
-        Retrieves the current user's profile information and account status.
-        
-        **Security**: 
-        - Requires login
-        
-      operationId: viewProfile
-      responses:
-        '200':
-          description: Profile retrieved
-          content:
-            text/html:
-              schema:
-                type: string
-                description: HTML profile page
-        '401':
-          description: Authentication required
-          headers:
-            Location:
-              schema:
-                type: string
-              description: Redirect to login page
-        '500':
-          description: Server error
-          
-    post:
-      tags:
-        - Profile
-      summary: Update User Profile
-      description: |
-        Updates the current user's profile information.
-        
-        **Security**: 
-        - Requires login
-        - CSRF protection recommended
-        
-      operationId: updateProfile
-      requestBody:
-        required: true
-        content:
-          application/x-www-form-urlencoded:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                  description: User's full name
-                  maxLength: 255
-                # Additional profile fields based on profile_fields.php configuration
-      responses:
-        '200':
-          description: Profile updated successfully
-          content:
-            text/html:
-              schema:
-                type: string
-                description: Updated HTML profile page
-        '400':
-          description: Validation error
-        '500':
-          description: Database error
-
-  # === Trade Management ===
-  /trade_new:
-    get:
-      tags:
-        - Trades
-      summary: New Trade Form
-      description: |
-        Displays the form for creating a new trade entry.
-        
-        **Security**: 
-        - Requires login
-        - May be locked if user has active MTM enrollment
-        
-      operationId: newTradeForm
-      parameters:
-        - name: mtm_task
-          in: query
-          description: MTM task ID for guided trade entry
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: New trade form
-          content:
-            text/html:
-              schema:
-                type: string
-        '302':
-          description: Redirect to login if not authenticated
-        '403':
-          description: Access denied - MTM enrollment active
-
-  /trade_edit:
-    get:
-      tags:
-        - Trades
-      summary: Edit Trade Form
-      description: |
-        Displays the form for editing an existing trade.
-        
-        **Security**: 
-        - Requires login
-        - Trade must belong to user
-        - Only editable if trade is not closed
-        
-      operationId: editTradeForm
-      parameters:
-        - name: id
-          in: query
-          required: true
-          description: Trade ID to edit
-          schema:
-            type: integer
-            minimum: 1
-      responses:
-        '200':
-          description: Edit trade form
-          content:
-            text/html:
-              schema:
-                type: string
-        '302':
-          description: Redirect to login if not authenticated
-        '404':
-          description: Trade not found or access denied
-
-  /trade_delete:
-    post:
-      tags:
-        - Trades
-      summary: Delete Trade
-      description: |
-        Soft deletes a trade (sets deleted_at timestamp if available, otherwise hard delete).
-        
-        **Security**: 
-        - Requires login
-        - Trade must belong to user
-        - CSRF protection recommended
-        
-      operationId: deleteTrade
-      responses:
-        '302':
-          description: Action completed - redirects back
-        '400':
-          description: Invalid request
-        '403':
-          description: Access denied
-        '500':
-          description: Database error
-
-  /trade_unlock_request:
-    get:
-      tags:
-        - Trades
-      summary: Unlock Trade Request
-      description: |
-        Displays form to request unlocking of a closed trade for editing.
-        
-        **Security**: 
-        - Requires login
-        - Trade must be closed and belong to user
-        
-      operationId: unlockRequestForm
-      parameters:
-        - name: id
-          in: query
-          required: true
-          description: Trade ID to request unlock
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: Unlock request form
-          content:
-            text/html:
-              schema:
-                type: string
-        '302':
-          description: Redirect to login if not authenticated
-
-  # === MTM User Interface ===
-  /mtm:
-    get:
-      tags:
-        - MTM
-      summary: MTM Programs Overview
-      description: |
-        Main MTM (Model Training Management) programs page.
-        
-        **Security**: 
-        - Requires login
-        
-      operationId: mtmPrograms
-      responses:
-        '200':
-          description: MTM programs page
-          content:
-            text/html:
-              schema:
-                type: string
-        '302':
-          description: Redirect to login if not authenticated
-
-  /mtm_enroll:
-    get:
-      tags:
-        - MTM
-      summary: MTM Enrollment
-      description: |
-        MTM enrollment page for users to view available models and enroll.
-        
-        **Security**: 
-        - Requires login and active user status
-        
-      operationId: mtmEnrollment
-      responses:
-        '200':
-          description: Enrollment page
-          content:
-            text/html:
-              schema:
-                type: string
-        '302':
-          description: Redirect based on authentication status
-
-  /mtm_model_user:
-    get:
-      tags:
-        - MTM
-      summary: User MTM Model View
-      description: |
-        Displays the user's enrolled MTM model with progress tracking.
-        
-        **Security**: 
-        - Requires login and active enrollment
-        
-      operationId: userMtmModel
-      parameters:
-        - name: id
-          in: query
-          required: true
-          description: Model ID
-          schema:
-            type: integer
-      responses:
-        '200':
-          description: User model view
-          content:
-            text/html:
-              schema:
-                type: string
-        '302':
-          description: Redirect if not enrolled or not authenticated
-        '404':
-          description: Model not found
+                type: object
+                required:
+                  - success
+                  - data
+                  - message
+                  - error
+                properties:
+                  success:
+                    type: boolean
+                    example: false
+                  data:
+                    type: "null"
+                  message:
+                    type: string
+                  error:
+                    type: string
 
 components:
   securitySchemes:
@@ -840,34 +2443,34 @@ components:
       description: PHP Session ID with admin privileges (is_admin=1)
 
   schemas:
-    ErrorResponse:
+    ApiResponse:
       type: object
       required:
         - success
-        - code
+        - data
         - message
+        - error
       properties:
         success:
           type: boolean
-          example: false
-        code:
-          type: string
-          description: Error code for programmatic handling
-          example: "VALIDATION_ERROR"
+          description: Operation success status
+        data:
+          type: object
+          nullable: true
+          description: Response data payload
         message:
           type: string
-          description: Human-readable error message
-          example: "The request contains invalid parameters"
-        details:
-          type: object
-          description: Additional error details (optional)
-          
+          description: Human-readable response message
+        error:
+          type: string
+          nullable: true
+          description: Error code or message
+
     MtmEnrollment:
       type: object
       required:
         - id
         - model_id
-        - model_code
         - model_name
         - tier
         - status
@@ -881,10 +2484,6 @@ components:
           type: integer
           description: MTM model ID
           example: 123
-        model_code:
-          type: string
-          description: Model code/identifier
-          example: "MTM-BASIC-001"
         model_name:
           type: string
           description: Human-readable model name
@@ -904,7 +2503,7 @@ components:
           format: date-time
           description: Enrollment start date
           example: "2025-11-01T10:00:00Z"
-          
+
     Trade:
       type: object
       required:
@@ -946,136 +2545,301 @@ components:
           type: string
           format: date-time
           description: Trade closing timestamp (if closed)
+          nullable: true
           example: "2025-11-05T14:45:00Z"
         notes:
           type: string
           description: Trade notes and analysis
+          nullable: true
           example: "Long-term growth position based on quarterly earnings"
         created_at:
           type: string
           format: date-time
           description: Trade creation timestamp
           example: "2025-11-05T10:30:00Z"
-          
+        outcome:
+          type: string
+          description: Trade outcome
+          enum: [win, loss, pending]
+          nullable: true
+
     Pagination:
       type: object
       required:
-        - limit
-        - offset
-        - count
+        - current_page
+        - per_page
+        - total_items
+        - total_pages
+        - has_next
+        - has_previous
       properties:
-        limit:
+        current_page:
           type: integer
-          description: Maximum number of items returned
+          description: Current page number
+          example: 1
+        per_page:
+          type: integer
+          description: Number of items per page
           example: 50
-        offset:
+        total_items:
           type: integer
-          description: Number of items skipped
-          example: 0
-        count:
+          description: Total number of items
+          example: 150
+        total_pages:
           type: integer
-          description: Actual number of items returned
-          example: 25
-          
+          description: Total number of pages
+          example: 3
+        has_next:
+          type: boolean
+          description: Whether there are more pages
+          example: true
+        has_previous:
+          type: boolean
+          description: Whether there are previous pages
+          example: false
+
+    AuditEvent:
+      type: object
+      required:
+        - id
+        - event_type
+        - event_category
+        - description
+        - severity
+        - status
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: Unique audit event ID
+          example: 1001
+        event_type:
+          type: string
+          description: Type of audit event
+          example: "user_login"
+        event_category:
+          type: string
+          description: Category of audit event
+          enum: [user_action, admin_action, system_event, security_event, trade_action, mtm_action, profile_action]
+          example: "user_action"
+        user_id:
+          type: integer
+          description: ID of user involved in event (if applicable)
+          nullable: true
+          example: 123
+        admin_id:
+          type: integer
+          description: ID of admin user who performed action (if applicable)
+          nullable: true
+          example: 456
+        target_type:
+          type: string
+          description: Type of entity that was targeted
+          nullable: true
+          example: "trade"
+        target_id:
+          type: integer
+          description: ID of targeted entity (if applicable)
+          nullable: true
+          example: 789
+        description:
+          type: string
+          description: Human-readable description of the event
+          example: "User logged in successfully"
+        metadata:
+          type: object
+          description: Additional event metadata as JSON
+          nullable: true
+        ip_address:
+          type: string
+          description: Client IP address
+          nullable: true
+          example: "192.168.1.100"
+        user_agent:
+          type: string
+          description: Client user agent
+          nullable: true
+          example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        session_id:
+          type: string
+          description: Session identifier
+          nullable: true
+          example: "abc123def456"
+        severity:
+          type: string
+          description: Event severity level
+          enum: [low, medium, high, critical]
+          example: "low"
+        status:
+          type: string
+          description: Event status
+          enum: [success, failure, warning, pending]
+          example: "success"
+        created_at:
+          type: string
+          format: date-time
+          description: Event timestamp
+          example: "2025-11-06T04:31:33.498Z"
+        user_name:
+          type: string
+          description: Name of user involved (if available)
+          nullable: true
+        user_email:
+          type: string
+          description: Email of user involved (if available)
+          nullable: true
+        admin_name:
+          type: string
+          description: Name of admin user (if available)
+          nullable: true
+        admin_email:
+          type: string
+          description: Email of admin user (if available)
+          nullable: true
+
     User:
       type: object
       required:
         - id
         - email
         - name
-        - role
         - status
       properties:
         id:
           type: integer
           description: User ID
           example: 123
-        email:
-          type: string
-          format: email
-          description: User email address
-          example: "user@example.com"
         name:
           type: string
           description: User's full name
           example: "John Doe"
-        role:
+        display_name:
           type: string
-          description: User role
-          enum: [user, admin, superadmin]
-          example: user
+          description: User's display name
+          nullable: true
+          example: "Johnny"
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "john.doe@example.com"
         status:
           type: string
           description: Account status
-          enum: [pending, active, needs_update, rejected]
-          example: active
+          enum: [pending, active, suspended, banned]
+          example: "active"
+        role:
+          type: string
+          description: User role
+          enum: [user, admin, moderator]
+          example: "user"
+        email_verified:
+          type: boolean
+          description: Whether email has been verified
+          example: true
         created_at:
           type: string
           format: date-time
           description: Account creation date
           example: "2025-01-15T08:00:00Z"
-          
-    MtmModel:
-      type: object
-      required:
-        - id
-        - title
-        - code
-        - difficulty
-        - estimated_days
-        - status
-      properties:
-        id:
-          type: integer
-          description: Model ID
-          example: 123
-        title:
+        last_login:
           type: string
-          description: Model title
-          example: "Basic Trading Fundamentals"
-        code:
-          type: string
-          description: Model code
-          example: "MTM-BASIC-001"
-        difficulty:
-          type: string
-          description: Difficulty level
-          enum: [easy, moderate, hard]
-          example: easy
-        estimated_days:
-          type: integer
-          description: Estimated completion time in days
-          example: 30
-        status:
-          type: string
-          description: Model status
-          enum: [draft, active, paused, archived]
-          example: active
-        description:
-          type: string
-          description: Model description
-          example: "Learn fundamental trading concepts and risk management"
-        cover_image_path:
-          type: string
-          description: Path to model cover image
-          example: "/img/mtm/basic-fundamentals.jpg"
+          format: date-time
+          description: Last login timestamp
+          nullable: true
+          example: "2025-11-05T14:30:00Z"
+
+    UserWithStats:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            profile_completion_score:
+              type: integer
+              description: Profile completion percentage
+              example: 85
+            location:
+              type: string
+              description: User location
+              nullable: true
+            timezone:
+              type: string
+              description: User timezone
+              nullable: true
+            bio:
+              type: string
+              description: User bio
+              nullable: true
+            stats:
+              type: object
+              properties:
+                total_trades:
+                  type: integer
+                  description: Total number of trades
+                  example: 25
+                total_enrollments:
+                  type: integer
+                  description: Total number of MTM enrollments
+                  example: 3
+                approved_enrollments:
+                  type: integer
+                  description: Number of approved enrollments
+                  example: 2
+                pending_enrollments:
+                  type: integer
+                  description: Number of pending enrollments
+                  example: 1
+                recent_trades_30d:
+                  type: integer
+                  description: Number of trades in last 30 days
+                  example: 5
+            activity_level:
+              type: string
+              description: User activity level based on recent trades
+              enum: [low, medium, high]
+              example: "medium"
+            admin_actions:
+              type: array
+              items:
+                type: string
+              description: Available admin actions for this user
+              example: ["approve", "reject", "suspend"]
+
+    UserProfile:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            preferences:
+              type: object
+              description: User preferences as JSON object
+              additionalProperties: true
+              nullable: true
+            profile_completion_score:
+              type: integer
+              description: Profile completion percentage
+              example: 90
 
 tags:
-  - name: MTM
-    description: Model Training Management APIs for structured trading programs
-  - name: Trades
-    description: Trade management and trading journal operations
+  - name: Health
+    description: Health check and monitoring endpoints
   - name: Dashboard
-    description: Main trading dashboard functionality
-  - name: Profile
-    description: User profile and account management
+    description: Dashboard data and metrics with audit trail logging
+  - name: MTM
+    description: Model Training Management APIs with audit trail compliance
+  - name: Trades
+    description: Trade management operations with financial audit logging
   - name: Admin
-    description: Administrative functions and user management
+    description: Administrative functions with comprehensive audit logging
+  - name: Profile
+    description: User profile management with security audit trails
   - name: Utility
     description: Utility functions and helper endpoints
+  - name: Audit
+    description: Compliance and audit trail management endpoints
   - name: User Management
-    description: Admin user management operations
+    description: Admin user management operations with audit logging
 
 externalDocs:
-  description: Complete API Documentation
-  url: https://docs.tradingplatform.com/api
+  description: Phase 3 Compliance Implementation Guide
+  url: https://docs.shaikhoology.com/compliance
