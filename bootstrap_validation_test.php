@@ -117,7 +117,7 @@ foreach ($required_functions as $func) {
 
 // Test 7: CSRF Token
 try {
-    $csrf_token = $_SESSION['csrf_token'] ?? null;
+    $csrf_token = $_SESSION['csrf'] ?? null;
     test_result('CSRF Token', !empty($csrf_token), !empty($csrf_token) ? 'Token: ' . substr($csrf_token, 0, 10) . '...' : 'No token found');
 } catch (Exception $e) {
     test_result('CSRF Token', false, 'Error: ' . $e->getMessage());

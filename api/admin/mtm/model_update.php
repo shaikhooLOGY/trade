@@ -26,8 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 try {
     // Require admin authentication
-    $adminUser = require_admin_json('Admin access required for model updates');
-    $adminId = (int)$adminUser['id'];
+    require_admin_json('Admin access required for model updates');
+    $adminId = (int)($_SESSION['user_id'] ?? 0);
     
     // Check CSRF for mutating operations
     csrf_api_middleware();
@@ -87,7 +87,7 @@ try {
     
     if ($result->num_rows === 0) {
         $stmt->close();
-        json_fail('NOT_FOUND', 'Model not found', 404);
+        json_fail('NOT_FOUND', 'Model not found', [], null, 404);
     }
     $stmt->close();
     

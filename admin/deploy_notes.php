@@ -12,7 +12,7 @@ function getv($k,$d=null){ return $_GET[$k] ?? $d; }
 
 // ----- Server-side AJAX Handlers -----
 if (getv('action') === 'scan_files') {
-    csrf_verify();
+    csrf_verify(get_csrf_token());
     
     $hours = max(2, min(24, (int)getv('hours', 4)));
     $docroot = $_SERVER['DOCUMENT_ROOT'] ?? '/home/u613260542/public_html';
@@ -56,7 +56,7 @@ if (getv('action') === 'scan_files') {
 }
 
 if (getv('action') === 'create_table') {
-    csrf_verify();
+    csrf_verify(get_csrf_token());
     
     $ddl = "
     CREATE TABLE IF NOT EXISTS deploy_notes (

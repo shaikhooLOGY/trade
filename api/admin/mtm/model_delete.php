@@ -26,8 +26,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 try {
     // Require admin authentication
-    $adminUser = require_admin_json('Admin access required for model deletion');
-    $adminId = (int)$adminUser['id'];
+    require_admin_json('Admin access required for model deletion');
+    $adminId = (int)($_SESSION['user_id'] ?? 0);
     
     // Check CSRF for mutating operations
     csrf_api_middleware();
@@ -67,7 +67,7 @@ try {
     
     if ($result->num_rows === 0) {
         $stmt->close();
-        json_fail('NOT_FOUND', 'Model not found', 404);
+        json_fail('NOT_FOUND', 'Model not found', [], null, 404);
     }
     
     $model = $result->fetch_assoc();
@@ -115,7 +115,7 @@ try {
     $deleteModelStmt->close();
     
     if ($affectedRows === 0) {
-        json_fail('NOT_FOUND', 'Model not found or already deleted', 404);
+        json_fail('NOT_FOUND', 'Model not found or already deleted', [], null, 404);
     }
     
     // Log admin action
