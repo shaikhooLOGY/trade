@@ -19,7 +19,7 @@ echo "🔍 DATABASE SCHEMA & INDEX INTEGRITY - PHASE 3 QC\n";
 echo "====================================================\n";
 echo "Timestamp: " . date('Y-m-d H:i:s') . "\n";
 echo "Database: " . $mysqli->server_info . "\n";
-echo "Connection: " . ($mysqli->ping() ? "Active" : "Failed") . "\n\n";
+echo "Connection: " . ($mysqli->query('SELECT 1') ? "Active" : "Failed") . "\n\n";
 
 class DatabaseIntegrityValidator
 {

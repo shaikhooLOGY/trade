@@ -209,7 +209,7 @@ echo "Connection Details:\n";
 echo "  Host: " . $mysqli->server_info . "\n";
 echo "  Client: " . $mysqli->client_info . "\n";
 echo "  Charset: " . $mysqli->character_set_name() . "\n";
-echo "  Status: " . ($mysqli->ping() ? "Connected" : "Disconnected") . "\n\n";
+echo "  Status: " . ($mysqli->query('SELECT 1') ? "Connected" : "Disconnected") . "\n\n";
 
 echo "❌ NO CONNECTION POOLING DETECTED\n";
 echo "  - Single connection per request\n";

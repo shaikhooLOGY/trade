@@ -187,7 +187,7 @@ echo "  Server Version: " . $mysqli->server_version . "\n";
 echo "  Host: " . $mysqli->server_info . "\n";
 echo "  Client: " . $mysqli->client_info . "\n";
 echo "  Charset: " . $mysqli->character_set_name() . "\n";
-echo "  Status: " . ($mysqli->ping() ? "Connected" : "Disconnected") . "\n";
+echo "  Status: " . ($mysqli->query('SELECT 1') ? "Connected" : "Disconnected") . "\n";
 echo "  Connection ID: " . $mysqli->thread_id . "\n\n";
 
 echo "❌ NO CONNECTION POOLING DETECTED\n";

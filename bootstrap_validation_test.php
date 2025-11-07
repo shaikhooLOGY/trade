@@ -88,10 +88,10 @@ try {
 try {
     global $mysqli;
     if (isset($mysqli) && $mysqli instanceof mysqli) {
-        if ($mysqli->ping()) {
+        if ($mysqli->query('SELECT 1')) {
             test_result('Database Connection', true, 'Database connection active');
         } else {
-            test_result('Database Connection', false, 'Database ping failed');
+            test_result('Database Connection', false, 'Database connection test failed');
         }
     } else {
         test_result('Database Connection', false, 'Database connection not established');
