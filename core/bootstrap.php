@@ -181,6 +181,9 @@ if (!function_exists('require_login_json')) {
  */
 if (!function_exists('require_admin_json')) {
     function require_admin_json(): void {
+        if (empty($_SESSION['user_id'])) {
+            json_error('Authentication required', 401);
+        }
         if (empty($_SESSION['is_admin'])) {
             json_error('Admin privileges required', 403);
         }

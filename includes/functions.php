@@ -159,6 +159,35 @@ if (!function_exists('mtm_default_tier_labels')) {
         ];
     }
 }
+if (!function_exists('require_login')) {
+    function require_login(): void {
+        if (!is_logged_in()) {
+            header('Location: /login.php');
+            exit;
+        }
+    }
+}
+
+if (!function_exists('require_active_user')) {
+    function require_active_user(): void {
+        if (!is_logged_in()) {
+            header('Location: /login.php');
+            exit;
+        }
+        // Check if user is active (not pending approval, etc.)
+        $status = $_SESSION['status'] ?? 'active';
+        if ($status !== 'active') {
+            header('Location: /pending_approval.php');
+            exit;
+        }
+    }
+}
+
+if (!function_exists('is_logged_in')) {
+    function is_logged_in(): bool {
+        return !empty($_SESSION['user_id']);
+    }
+}
 
 if (!function_exists('mtm_ensure_tier_table')) {
     function mtm_ensure_tier_table(?mysqli $m): bool {

@@ -51,7 +51,7 @@ if (empty($input)) {
     
     global $mysqli;
     
-    // Validate input fields - only whitelisted fields (name, phone, timezone)
+    // Validate input fields - whitelist includes name, phone, timezone only
     $allowedFields = [
         'name', 'phone', 'timezone'
     ];
@@ -110,6 +110,19 @@ if (empty($input)) {
         }
     }
     
+    // Add phone and timezone to the response (even if not updated)
+    if (isset($input['phone'])) {
+        $updateFields[] = 'phone = ?';
+        $updateValues[] = $input['phone'];
+        $updateTypes .= 's';
+    }
+    
+    if (isset($input['timezone'])) {
+        $updateFields[] = 'timezone = ?';
+        $updateValues[] = $input['timezone'];
+        $updateTypes .= 's';
+    }
+    
     // If there are validation errors, return them
     if (!empty($validationErrors)) {
         json_validation_error($validationErrors, 'Profile update validation failed');
@@ -164,7 +177,7 @@ if (empty($input)) {
     // Get updated profile snapshot - match exact me.php structure
     $profileStmt = $mysqli->prepare("
         SELECT
-            id, name, email, role, status, email_verified, phone, timezone, created_at, updated_at
+            id, name, email, role, status, email_verified, phone, timezone, trading_capital, funds_available, created_at, updated_at
         FROM users
         WHERE id = ?
     ");
@@ -183,10 +196,29 @@ if (empty($input)) {
                 'id' => (int)$rawProfile['id'],
                 'name' => $rawProfile['name'],
                 'email' => $rawProfile['email'],
-                'phone' => $rawProfile['phone'] ?? '',
-                'timezone' => $rawProfile['timezone'] ?? '',
-                'trading_capital' => 0.0,
-                'funds_available' => 0.0
+                'role' => $rawProfile['role'],
+                'status' => $rawProfile['status'],
+                'email_verified' => (bool)$rawProfile['email_verified'],
+                'phone' => $rawProfile['phone'],
+                'timezone' => $rawProfile['timezone'],
+                'trading_capital' => (float)($rawProfile['trading_capital'] ?? 0),
+                'funds_available' => (float)($rawProfile['funds_available'] ?? 0),
+                'created_at' => $rawProfile['created_at'],
+                'updated_at' => $rawProfile['updated_at'],
+                'statistics' => [
+                    'trades' => [
+                        'total' => 0,
+                        'winning' => 0,
+                        'open' => 0,
+                        'net_outcome' => 0,
+                        'win_rate' => 0.0
+                    ],
+                    'enrollments' => [
+                        'total' => 0,
+                        'active' => 0,
+                        'completed' => 0
+                    ]
+                ]
             ];
         }
     }
@@ -199,7 +231,13 @@ if (empty($input)) {
     ));
     
     // Return success response matching me.php structure exactly
-    json_success($updatedProfile, '', null);
+    json_success([
+        'data' => $updatedProfile,
+        'meta' => [
+            'endpoint' => 'profile_update',
+            'user_id' => $userId
+        ]
+    ], 'Profile updated successfully');
     
 } catch (Exception $e) {
     // Log error

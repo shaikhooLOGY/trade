@@ -111,7 +111,7 @@ if (!function_exists('mtm_enroll')) {
             ]);
             
             // Check for existing enrollment (UNIQUE constraint will catch this too)
-            $checkStmt = $mysqli->prepare("SELECT id FROM mtm_enrollments WHERE trader_id = ? AND model_id = ?");
+            $checkStmt = $mysqli->prepare("SELECT id FROM mtm_enrollments WHERE user_id = ? AND model_id = ?");
             if (!$checkStmt) {
                 throw new Exception("Failed to prepare enrollment check");
             }
@@ -143,7 +143,7 @@ if (!function_exists('mtm_enroll')) {
             
             // Insert new enrollment
             $enrollStmt = $mysqli->prepare("
-                INSERT INTO mtm_enrollments (trader_id, model_id, tier, status) 
+                INSERT INTO mtm_enrollments (user_id, model_id, tier, status)
                 VALUES (?, ?, ?, 'active')
             ");
             
@@ -247,7 +247,7 @@ if (!function_exists('get_user_enrollments')) {
                     m.name as model_name
                 FROM mtm_enrollments e
                 JOIN mtm_models m ON e.model_id = m.id
-                WHERE e.trader_id = ?
+                WHERE e.user_id = ?
                 ORDER BY e.created_at DESC
             ");
             

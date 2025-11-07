@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // Require admin authentication
-require_admin_json('Admin access required');
+require_admin_json();
 
 try {
     global $mysqli;

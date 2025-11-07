@@ -2,15 +2,14 @@
 /**
  * Admin API Bootstrap
  * Admin-specific initialization and security checks
- * Phase-3 Litmus Auto-Fix Pack: Ensures proper loading of core components
+ * Phase-3 Compliance Implementation: Standardized auth guard
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
 require_once __DIR__ . '/../../includes/http/json.php';
 require_once __DIR__ . '/../../includes/security/ratelimit.php';
 require_once __DIR__ . '/../../includes/logger/audit_log.php';
+require_once __DIR__ . '/../../includes/security/auth.php';
 
-// Admin session check
-if (!isset($_SESSION['is_admin']) || $_SESSION['is_admin'] !== 1) {
-    json_error("UNAUTHORIZED", "Login required", null, 401);
-}
+// NOTE: Individual endpoints should call require_admin_auth_json()
+// This ensures proper 401/403 separation for unauthenticated vs non-admin users

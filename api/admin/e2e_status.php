@@ -8,8 +8,8 @@
 
 require_once __DIR__ . '/_bootstrap.php';
 
-// Use proper JSON error for unauthenticated access
-require_admin_json('Admin access required');
+// Standardized admin authentication with proper 401/403 handling
+$admin = require_admin_auth_json();
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');

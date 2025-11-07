@@ -149,21 +149,21 @@ try {
         $deletedCondition = $hasDeletedAt ? "AND t.deleted_at IS NULL" : '';
         
         $stmt = $mysqli->prepare("
-            SELECT 
+            SELECT
                 DATE(t.opened_at) as trade_date,
                 COUNT(*) as daily_trades,
-                SUM(CASE 
+                SUM(CASE
                     WHEN t.side = 'buy' THEN t.quantity * (COALESCE(t.close_price, t.price) - t.price)
                     ELSE t.quantity * (t.price - COALESCE(t.close_price, t.price))
                 END) as daily_pnl,
                 COUNT(CASE WHEN t.outcome = 'win' THEN 1 END) as daily_wins,
                 COUNT(*) as total_trades
             FROM trades t
-            WHERE t.{$traderColumn} = ? 
+            WHERE t.{$traderColumn} = ?
             AND t.opened_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
             $deletedCondition
             GROUP BY DATE(t.opened_at)
-            ORDER BY t.opened_at DESC
+            ORDER BY trade_date DESC
             LIMIT 30
         ");
         

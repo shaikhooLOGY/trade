@@ -2,11 +2,11 @@
     "project_metadata": {
         "name": "Shaikhoology TMS-MTM Platform - Unified Core",
         "version": "2.2.0",
-        "phase": "P3-litmus",
-        "description": "Enterprise Trading Management System with unified core bootstrap, comprehensive audit trails, and security hardening",
+        "phase": "P3-e2e-polish",
+        "description": "Enterprise Trading Management System with unified core bootstrap, comprehensive audit trails, security hardening, and E2E logic polish for 85-90% test pass rate",
         "current_branch": "production-readiness-unified-core",
         "implementation_date": "2025-11-06",
-        "last_validation": "2025-11-07T12:53:54.000Z",
+        "last_validation": "2025-11-07T13:36:00.000Z",
         "unified_core_verified": "2025-11-06T21:24:00.000Z",
         "litmus_fixes_applied": "2025-11-06T21:24:00.000Z",
         "frontend_probe_ts": "2025-11-06T22:00:46.745Z",
@@ -14,6 +14,7 @@
         "gate": "GREEN",
         "compliance_level": "98%+",
         "enterprise_ready": true,
+        "expected_pass_rate": 85,
         "last_litmus_ts": "2025-11-07T07:38:46.592Z",
         "litmus_pass_rate": "100.0%",
         "litmus_all_checks_passed": true,
@@ -396,21 +397,21 @@
         "artifacts_url": null
     },
     "last_full_e2e": {
-        "timestamp": "2025-11-07_17-18-35",
-        "result": 48.38709677419355,
-        "test_user": "e2e_user_2025-11-07_17-18-35@local.test",
+        "timestamp": "2025-11-07_18-51-51",
+        "result": 54.83870967741935,
+        "test_user": "e2e_user_2025-11-07_18-51-51@local.test",
         "admin_user": "admin@local.test",
         "cleanup": false,
         "e2e_mode": true,
         "csrf_bypass": true,
-        "pass_rate": 48.38709677419355,
-        "artifacts_path": "2025-11-07_17-18-35"
+        "pass_rate": 54.83870967741935,
+        "artifacts_path": "2025-11-07_18-51-51"
     },
     "last_quick_litmus": {
-        "timestamp": "2025-11-07T10:42:26.000Z",
+        "timestamp": "2025-11-07T14:10:20.000Z",
         "pass_rate": "100%",
         "gate": "GREEN",
-        "resolved_base_url": "http:\/\/127.0.0.1:8084",
+        "resolved_base_url": "http:\/\/127.0.0.1:8082",
         "base_url_source": "flag",
         "connection_family": "v4"
     }

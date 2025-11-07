@@ -39,7 +39,7 @@ try {
     $status = isset($_GET['status']) ? strtolower(trim($_GET['status'])) : null;
     
     // Build WHERE clause
-    $whereConditions = ['user_id = ?'];
+    $whereConditions = ['trader_id = ?'];
     $params = [$userId];
     $paramTypes = ['i'];
     

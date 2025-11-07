@@ -29,8 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 // Apply rate limiting (stricter for admin endpoint)
 require_rate_limit('admin_agent_logs', 10);
 
-// Require admin authentication
-require_admin_json();
+// Standardized admin authentication with proper 401/403 handling
+$admin = require_admin_auth_json();
 
 try {
     global $mysqli;
