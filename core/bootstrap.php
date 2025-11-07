@@ -262,14 +262,7 @@ if (function_exists('initialize_audit_logging')) {
 // Set global database connection for backward compatibility
 $global_db = $GLOBALS['mysqli'] ?? null;
 
-// Log bootstrap completion in development (only if function exists)
-if (APP_ENV === 'local') {
-    if (function_exists('app_log')) {
-        app_log('debug', 'Unified bootstrap loaded successfully');
-    } else {
-        // Fallback logging for when app_log is not yet available
-        if (defined('STDIN') || !headers_sent()) {
-            echo "DEBUG: Unified bootstrap loaded successfully at " . date('c') . "\n";
-        }
-    }
+// Log bootstrap completion
+if (function_exists('app_log')) {
+    app_log('info', 'Unified bootstrap loaded successfully');
 }

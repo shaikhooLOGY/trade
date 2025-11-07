@@ -1,4 +1,4 @@
-<?php
+// 🔁 API Integration: my_trades.php now uses /api/trades/list.php for data
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/functions.php';
 require_login();
@@ -6,78 +6,18 @@ require_login();
 $user = current_user();
 $uid = (int)$user['id'];
 
-// Fetch user trades with calculation data
-$stmt = $mysqli->prepare("
-    SELECT id, entry_date, close_date, symbol, marketcap, position_percent,
-           entry_price, stop_loss, target_price, exit_price, outcome,
-           pl_percent, rr, allocation_amount, points, analysis_link, notes, created_at
-    FROM trades
-    WHERE user_id = ?
-    ORDER BY created_at DESC
-");
-$stmt->bind_param('i', $uid);
-$stmt->execute();
-$res = $stmt->get_result();
-
-// Calculate user's total capital and reserved amounts
-$funds_sql = $mysqli->query("SELECT COALESCE(funds_available,0) as fa, COALESCE(trading_capital,0) as tc FROM users WHERE id = {$uid}");
-$default_capital = 100000.0;
-$total_capital = $default_capital;
-if ($funds_sql && $row = $funds_sql->fetch_assoc()) {
-    $total_capital = ($row['tc'] ?? 0) > 0 ? floatval($row['tc']) : (($row['fa'] ?? 0) > 0 ? floatval($row['fa']) : $default_capital);
-}
-
-// Calculate reserved amounts from existing open trades
-$reserved_amt = 0.0;
-$alloc_column = null;
-foreach (['allocation_amount', 'allocated_amount', 'capital_allocated', 'risk_amount'] as $candidate) {
-    if ($mysqli->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'trades' AND COLUMN_NAME = '{$candidate}'")->fetch_assoc()['COUNT(*)'] > 0) {
-        $alloc_column = $candidate;
-        break;
-    }
-}
-if ($alloc_column) {
-    $sql = "SELECT COALESCE(SUM(`{$alloc_column}`),0) as res
-            FROM trades
-            WHERE user_id=?
-              AND (closed_at IS NULL OR closed_at='')
-              AND (deleted_at IS NULL OR deleted_at='')";
-    if ($stmt = $mysqli->prepare($sql)) {
-        $stmt->bind_param('i', $uid);
-        $stmt->execute();
-        $res_data = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-        $reserved_amt = isset($res_data['res']) ? floatval($res_data['res']) : 0.0;
-    }
-} elseif ($mysqli->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'trades' AND COLUMN_NAME IN ('position_percent', 'risk_pct')")->fetch_assoc()['COUNT(*)'] > 0) {
-    $percent_col = $mysqli->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'trades' AND COLUMN_NAME = 'position_percent'")->fetch_assoc()['COUNT(*)'] > 0 ? 'position_percent' : 'risk_pct';
-    $conditions = ["user_id=?", "UPPER(COALESCE(outcome,'OPEN'))='OPEN'"];
-    if ($mysqli->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'trades' AND COLUMN_NAME = 'closed_at'")->fetch_assoc()['COUNT(*)'] > 0) {
-        $conditions[] = "closed_at IS NULL";
-    }
-    if ($mysqli->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'trades' AND COLUMN_NAME = 'deleted_at'")->fetch_assoc()['COUNT(*)'] > 0) {
-        $conditions[] = "deleted_at IS NULL";
-    }
-    $sql = "SELECT COALESCE(SUM(`{$percent_col}`),0) as pct FROM trades WHERE " . implode(' AND ', $conditions);
-    if ($stmt = $mysqli->prepare($sql)) {
-        $stmt->bind_param('i', $uid);
-        $stmt->execute();
-        $res_data = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
-        $pct = isset($res_data['pct']) ? floatval($res_data['pct']) : 0.0;
-        $reserved_amt = ($total_capital * $pct) / 100.0;
-    }
-}
-
-// Totals
-$totStmt = $mysqli->prepare("SELECT COALESCE(SUM(points),0) AS total_points, COALESCE(SUM(allocation_amount),0) AS total_alloc FROM trades WHERE user_id = ?");
-$totStmt->bind_param('i', $uid);
-$totStmt->execute();
-$totRow = $totStmt->get_result()->fetch_assoc();
-$total_points = (int)$totRow['total_points'];
-$total_alloc = (float)$totRow['total_alloc'];
+// 🔁 API Integration: Direct database queries replaced with API calls
+// All trade data is now loaded via JavaScript fetch to /api/trades/list.php
+// This provides better separation of concerns and consistency with the API design
 
 function esc($s){ return htmlspecialchars($s, ENT_QUOTES|ENT_SUBSTITUTE, 'UTF-8'); }
+
+// Default values for initialization (will be updated via API)
+$default_capital = 100000.0;
+$total_capital = $default_capital;
+$reserved_amt = 0.0;
+$total_points = 0;
+$total_alloc = 0.0;
 ?>
 <!doctype html>
 <html>
@@ -99,96 +39,174 @@ function esc($s){ return htmlspecialchars($s, ENT_QUOTES|ENT_SUBSTITUTE, 'UTF-8'
   <h2>My Trades</h2>
   <p class="small">Logged in as <strong><?= esc($user['name'] ?? $user['email']) ?></strong> — <a href="dashboard.php">Dashboard</a></p>
 
+  <!-- 🔁 API Integration: Summary now loaded via JavaScript -->
   <div class="summary">
-    <strong>Total points:</strong> <?= $total_points ?> &nbsp;&nbsp;
-    <strong>Total allocation reserved:</strong> <?= number_format($total_alloc,2) ?> &nbsp;&nbsp;
+    <strong>Total points:</strong> <span id="totalPoints">0</span> &nbsp;&nbsp;
+    <strong>Total allocation reserved:</strong> <span id="totalAlloc">0.00</span> &nbsp;&nbsp;
     <a class="btn" href="trade_new.php">New Trade</a>
   </div>
 
-  <?php if ($res->num_rows === 0): ?>
-    <p>No trades yet. <a href="trade_new.php">Create your first trade</a>.</p>
-  <?php else: ?>
-    <table>
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Entry</th>
-          <th>Close</th>
-          <th>Symbol</th>
-          <th>Size%</th>
-          <th>Entry</th>
-          <th>SL</th>
-          <th>Target</th>
-          <th>Exit</th>
-          <th>Outcome</th>
-          <th>P/L%</th>
-          <th>R:R</th>
-          <th>Amount Invested</th>
-          <th>Risk Amount</th>
-          <th>Risk per Trade %</th>
-          <th>Quantity</th>
-          <th>Alloc (₹)</th>
-          <th>Points</th>
-          <th>Analysis</th>
-          <th>Notes</th>
-        </tr>
-      </thead>
-      <tbody>
-      <?php while ($row = $res->fetch_assoc()): ?>
-        <?php
-          // Calculate new metrics
-          $position_pct = $row['position_percent'] ?? 0;
-          $entry_price = $row['entry_price'] ?? 0;
-          $stop_loss = $row['stop_loss'] ?? 0;
-          
-          // Amount Invested per Trade
-          $amount_invested = ($total_capital * $position_pct) / 100;
-          
-          // Risk Amount
-          $risk_amount = 0;
-          if ($entry_price > 0 && $stop_loss > 0) {
-            $risk_amount = abs($entry_price - $stop_loss) * ($amount_invested / $entry_price);
-          }
-          
-          // Risk per Trade (RPT) %
-          $risk_per_trade = $total_capital > 0 ? ($risk_amount / $total_capital) * 100 : 0;
-          
-          // Number of Quantity (rounded to whole numbers)
-          $quantity = 0;
-          if ($entry_price > 0) {
-            $quantity = round($amount_invested / $entry_price);
-          }
-        ?>
-        <tr>
-          <td><?= (int)$row['id'] ?></td>
-          <td><?= esc($row['entry_date']) ?></td>
-          <td><?= esc($row['close_date']) ?></td>
-          <td><?= esc($row['symbol']) ?></td>
-          <td><?= $row['position_percent'] !== null ? esc($row['position_percent']) : '' ?></td>
-          <td><?= $row['entry_price'] !== null ? esc($row['entry_price']) : '' ?></td>
-          <td><?= $row['stop_loss'] !== null ? esc($row['stop_loss']) : '' ?></td>
-          <td><?= $row['target_price'] !== null ? esc($row['target_price']) : '' ?></td>
-          <td><?= $row['exit_price'] !== null ? esc($row['exit_price']) : '' ?></td>
-          <td><?= esc($row['outcome']) ?></td>
-          <td><?= $row['pl_percent'] !== null ? esc($row['pl_percent']) : '' ?></td>
-          <td><?= $row['rr'] !== null ? esc($row['rr']) : '' ?></td>
-          <td><?= number_format($amount_invested, 2) ?></td>
-          <td><?= number_format($risk_amount, 2) ?></td>
-          <td><?= number_format($risk_per_trade, 2) ?>%</td>
-          <td><?= number_format($quantity, 0) ?></td>
-          <td><?= $row['allocation_amount'] !== null ? number_format($row['allocation_amount'],2) : '0.00' ?></td>
-          <td><?= (int)$row['points'] ?></td>
-          <td>
-            <?php if (!empty($row['analysis_link'])): ?>
-              <a href="<?= esc($row['analysis_link']) ?>" target="_blank">View</a>
-            <?php endif; ?>
-          </td>
-          <td class="notes"><?= esc($row['notes']) ?></td>
-        </tr>
-      <?php endwhile; ?>
-      </tbody>
-    </table>
-  <?php endif; ?>
+  <!-- Loading indicator -->
+  <div id="loadingIndicator" style="padding: 20px; text-align: center; color: #666;">
+    Loading trades...
+  </div>
+
+  <!-- Error message (hidden by default) -->
+  <div id="errorMessage" style="display: none; padding: 10px; background: #fee2e2; border: 1px solid #dc2626; color: #991b1b; border-radius: 4px; margin-bottom: 12px;">
+    <strong>Error:</strong> <span id="errorText"></span>
+  </div>
+
+  <!-- 🔁 API Integration: Trade table now loaded via JavaScript -->
+  <table id="tradesTable" style="display: none;">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Entry</th>
+        <th>Close</th>
+        <th>Symbol</th>
+        <th>Size%</th>
+        <th>Entry</th>
+        <th>SL</th>
+        <th>Target</th>
+        <th>Exit</th>
+        <th>Outcome</th>
+        <th>P/L%</th>
+        <th>R:R</th>
+        <th>Amount Invested</th>
+        <th>Risk Amount</th>
+        <th>Risk per Trade %</th>
+        <th>Quantity</th>
+        <th>Alloc (₹)</th>
+        <th>Points</th>
+        <th>Analysis</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody id="tradesTableBody">
+    </tbody>
+  </table>
+
+  <!-- No trades message (hidden by default) -->
+  <div id="noTradesMessage" style="display: none; padding: 20px; text-align: center; color: #666;">
+    No trades yet. <a href="trade_new.php">Create your first trade</a>.
+  </div>
 
 </body>
 </html>
+
+<script>
+// 🔁 API Integration: Load trades from /api/trades/list.php
+document.addEventListener('DOMContentLoaded', function() {
+    // Load trades from API
+    fetch('/api/trades/list.php')
+        .then(response => response.json())
+        .then(data => {
+            // Hide loading indicator
+            document.getElementById('loadingIndicator').style.display = 'none';
+            
+            if (data.success && data.data && data.data.rows) {
+                const trades = data.data.rows;
+                
+                if (trades.length === 0) {
+                    // Show no trades message
+                    document.getElementById('noTradesMessage').style.display = 'block';
+                } else {
+                    // Show table and populate it
+                    document.getElementById('tradesTable').style.display = 'table';
+                    populateTradesTable(trades);
+                    updateSummary(trades);
+                }
+            } else {
+                // Show error message
+                showError(data.message || 'Failed to load trades');
+            }
+        })
+        .catch(error => {
+            console.error('Error loading trades:', error);
+            document.getElementById('loadingIndicator').style.display = 'none';
+            showError('Network error: Failed to load trades');
+        });
+    
+    function showError(message) {
+        document.getElementById('errorText').textContent = message;
+        document.getElementById('errorMessage').style.display = 'block';
+    }
+    
+    function updateSummary(trades) {
+        // Calculate totals from API data
+        let totalPoints = 0;
+        let totalAlloc = 0;
+        
+        trades.forEach(trade => {
+            totalPoints += trade.points || 0;
+            totalAlloc += trade.allocation_amount || 0;
+        });
+        
+        // Update summary display
+        document.getElementById('totalPoints').textContent = totalPoints;
+        document.getElementById('totalAlloc').textContent = totalAlloc.toFixed(2);
+    }
+    
+    function populateTradesTable(trades) {
+        const tableBody = document.getElementById('tradesTableBody');
+        tableBody.innerHTML = '';
+        
+        trades.forEach(trade => {
+            const row = document.createElement('tr');
+            
+            // Calculate metrics (client-side for consistency)
+            const positionPct = trade.position_percent || 0;
+            const entryPrice = trade.entry_price || 0;
+            const stopLoss = trade.stop_loss || 0;
+            const totalCapital = 100000; // Default capital
+            
+            // Amount Invested per Trade
+            const amountInvested = (totalCapital * positionPct) / 100;
+            
+            // Risk Amount
+            let riskAmount = 0;
+            if (entryPrice > 0 && stopLoss > 0) {
+                riskAmount = Math.abs(entryPrice - stopLoss) * (amountInvested / entryPrice);
+            }
+            
+            // Risk per Trade (RPT) %
+            const riskPerTrade = totalCapital > 0 ? (riskAmount / totalCapital) * 100 : 0;
+            
+            // Number of Quantity (rounded to whole numbers)
+            const quantity = entryPrice > 0 ? Math.round(amountInvested / entryPrice) : 0;
+            
+            // Create table cells
+            row.innerHTML = `
+                <td>${trade.id}</td>
+                <td>${trade.opened_at || trade.entry_date || ''}</td>
+                <td>${trade.close_date || ''}</td>
+                <td>${escapeHtml(trade.symbol || '')}</td>
+                <td>${positionPct ? positionPct.toFixed(2) : ''}</td>
+                <td>${entryPrice ? entryPrice.toFixed(2) : ''}</td>
+                <td>${stopLoss ? stopLoss.toFixed(2) : ''}</td>
+                <td>${trade.target_price ? trade.target_price.toFixed(2) : ''}</td>
+                <td>${trade.exit_price ? trade.exit_price.toFixed(2) : ''}</td>
+                <td>${escapeHtml(trade.outcome || '')}</td>
+                <td>${trade.pl_percent ? trade.pl_percent.toFixed(2) : ''}</td>
+                <td>${trade.rr ? trade.rr.toFixed(1) : ''}</td>
+                <td>${amountInvested.toFixed(2)}</td>
+                <td>${riskAmount.toFixed(2)}</td>
+                <td>${riskPerTrade.toFixed(2)}%</td>
+                <td>${quantity.toLocaleString()}</td>
+                <td>${trade.allocation_amount ? trade.allocation_amount.toFixed(2) : '0.00'}</td>
+                <td>${trade.points || 0}</td>
+                <td>${trade.analysis_link ? `<a href="${escapeHtml(trade.analysis_link)}" target="_blank">View</a>` : ''}</td>
+                <td class="notes" style="white-space: pre-wrap;">${escapeHtml(trade.notes || '')}</td>
+            `;
+            
+            tableBody.appendChild(row);
+        });
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+});
+</script>

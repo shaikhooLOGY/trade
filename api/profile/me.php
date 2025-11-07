@@ -37,14 +37,16 @@ try {
     
     global $mysqli;
     
-    // Get user profile data
-    $stmt = $mysqli->prepare("
+    // Get user profile data with financial fields
+    $profileQuery = "
         SELECT
-            id, name, email, role, status, email_verified, created_at, updated_at
+            id, name, email, role, status, email_verified,
+            trading_capital, funds_available, created_at, updated_at
         FROM users
         WHERE id = ?
-    ");
+    ";
     
+    $stmt = $mysqli->prepare($profileQuery);
     if (!$stmt) {
         throw new Exception('Failed to prepare profile query');
     }
@@ -59,8 +61,50 @@ try {
         json_error('User profile not found', 404);
     }
     
-    // Get additional statistics (simplified)
+    // Get additional statistics
     $stats = ['total_trades' => 0, 'open_trades' => 0, 'total_enrollments' => 0, 'active_enrollments' => 0, 'completed_enrollments' => 0];
+    
+    // Calculate additional trade statistics
+    try {
+        // Check column existence
+        $userCheck = $mysqli->query("SHOW COLUMNS FROM trades LIKE 'user_id'");
+        $userColumn = 'trader_id';
+        if ($userCheck->num_rows > 0) {
+            $userColumn = 'user_id';
+        }
+        $userCheck->close();
+        
+        $deletedCheck = $mysqli->query("SHOW COLUMNS FROM trades LIKE 'deleted_at'");
+        $hasDeleted = $deletedCheck->num_rows > 0;
+        $deletedCheck->close();
+        
+        $deletedCondition = $hasDeleted ? "AND deleted_at IS NULL" : '';
+        
+        // Total trades count
+        $countQuery = "SELECT COUNT(*) as total FROM trades WHERE {$userColumn} = ? {$deletedCondition}";
+        $countStmt = $mysqli->prepare($countQuery);
+        if ($countStmt) {
+            $countStmt->bind_param('i', $userId);
+            $countStmt->execute();
+            $countResult = $countStmt->get_result();
+            $stats['total_trades'] = (int)$countResult->fetch_assoc()['total'];
+            $countStmt->close();
+        }
+        
+        // Open trades count
+        $openQuery = "SELECT COUNT(*) as open_count FROM trades WHERE {$userColumn} = ? AND (outcome = 'open' OR outcome IS NULL) {$deletedCondition}";
+        $openStmt = $mysqli->prepare($openQuery);
+        if ($openStmt) {
+            $openStmt->bind_param('i', $userId);
+            $openStmt->execute();
+            $openResult = $openStmt->get_result();
+            $stats['open_trades'] = (int)$openResult->fetch_assoc()['open_count'];
+            $openStmt->close();
+        }
+        
+    } catch (Exception $e) {
+        // Keep default values if calculation fails
+    }
     
     // Format response using unified JSON envelope
     $profileData = [
@@ -70,8 +114,8 @@ try {
         'role' => $profile['role'],
         'status' => $profile['status'],
         'email_verified' => (bool)$profile['email_verified'],
-        'trading_capital' => 0.0,
-        'funds_available' => 0.0,
+        'trading_capital' => (float)($profile['trading_capital'] ?? 0.0),
+        'funds_available' => (float)($profile['funds_available'] ?? 0.0),
         'created_at' => $profile['created_at'],
         'updated_at' => $profile['updated_at'],
         'statistics' => [

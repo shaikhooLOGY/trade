@@ -1,5 +1,6 @@
+// 🔁 API Integration: replaced direct DB with /api/admin/users/update.php
 <?php
-// admin/user_action.php — centralized admin user actions
+// admin/user_action.php — centralized admin user actions (API Integrated)
 require_once __DIR__ . '/../includes/bootstrap.php';
 
 if (empty($_SESSION['is_admin'])) {
@@ -13,6 +14,33 @@ function back($msg) {
   exit;
 }
 
+function callAdminApi($endpoint, $data = []) {
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => [
+                'Content-Type: application/x-www-form-urlencoded',
+                'Cookie: ' . $_SERVER['HTTP_COOKIE'] ?? '',
+                'X-Requested-With: XMLHttpRequest'
+            ],
+            'content' => http_build_query($data),
+            'ignore_errors' => true
+        ]
+    ]);
+    
+    $response = @file_get_contents($endpoint, false, $context);
+    if ($response === false) {
+        return ['error' => 'Failed to connect to API'];
+    }
+    
+    $result = json_decode($response, true);
+    if (json_last_error() !== JSON_ERROR_NONE) {
+        return ['error' => 'Invalid JSON response'];
+    }
+    
+    return $result;
+}
+
 $id   = (int)($_POST['id'] ?? 0);
 $act  = trim($_POST['action'] ?? '');
 $csrf = $_POST['csrf'] ?? '';
@@ -21,139 +49,37 @@ if ($id <= 0 || $csrf === '' || !validate_csrf($csrf)) {
   back('❌ Invalid request.');
 }
 
-// Who is acting
-$me = (int)($_SESSION['user_id'] ?? 0);
+// 🔁 API Integration: All user management now handled by /api/admin/users/update.php
+$postData = [
+    'id' => $id,
+    'action' => $act,
+    'csrf' => $csrf,
+    'reason' => trim($_POST['reason'] ?? '')
+];
 
-switch ($act) {
-  case 'approve': {
-    $sql = "UPDATE users SET status='active', profile_status='approved',
-                             last_reviewed_by=?, last_reviewed_at=NOW()
-            WHERE id=?";
-    if ($st = $mysqli->prepare($sql)) {
-      $st->bind_param('ii', $me, $id);
-      $ok = $st->execute();
-      $st->close();
-      back($ok ? '✅ User approved.' : '❌ DB error approving user.');
-    }
-    back('❌ Prepare failed.');
-    break;
-  }
-
-  case 'send_back': {
-    $reason = trim($_POST['reason'] ?? '');
-    $sql = "UPDATE users SET status='needs_update', profile_status='needs_update',
-                             rejection_reason=?, last_reviewed_by=?, last_reviewed_at=NOW()
-            WHERE id=?";
-    if ($st = $mysqli->prepare($sql)) {
-      $st->bind_param('sii', $reason, $me, $id);
-      $ok = $st->execute();
-      $st->close();
-      back($ok ? '↩️ User sent back.' : '❌ DB error sending back.');
-    }
-    back('❌ Prepare failed.');
-    break;
-  }
-
-  case 'send_back_detail': {
+// Add detailed field data for send_back_detail action
+if ($act === 'send_back_detail') {
     $pfFile = __DIR__ . '/../profile_fields.php';
     $profile_fields = file_exists($pfFile) ? include $pfFile : [];
-
-    $statusMap = [];
-    $commentMap = [];
-
+    
     foreach ($profile_fields as $field => $cfg) {
-      $ok = !empty($_POST['ok_'.$field]);
-      $comment = trim((string)($_POST['comment_'.$field] ?? ''));
-      if ($ok) {
-        $statusMap[$field] = 'ok';
-      } elseif ($comment !== '') {
-        $statusMap[$field] = 'needs_update';
-        $commentMap[$field] = $comment;
-      }
+        $postData['ok_'.$field] = !empty($_POST['ok_'.$field]) ? '1' : '0';
+        $postData['comment_'.$field] = trim((string)($_POST['comment_'.$field] ?? ''));
     }
+}
 
-    $status_json   = !empty($statusMap)   ? json_encode($statusMap)   : null;
-    $comments_json = !empty($commentMap) ? json_encode($commentMap) : null;
+// Make API call
+$result = callAdminApi('/api/admin/users/update.php', $postData);
 
-    $sql = "UPDATE users SET profile_status='needs_update', status='needs_update',
-                             profile_field_status=?, profile_comments=?,
-                             last_reviewed_by=?, last_reviewed_at=NOW()
-            WHERE id=?";
-    if ($st = $mysqli->prepare($sql)) {
-      $st->bind_param('ssii', $status_json, $comments_json, $me, $id);
-      $ok = $st->execute();
-      $st->close();
-      back($ok ? '↩️ Sent back with detailed feedback.' : '❌ DB error sending back.');
+if (isset($result['success']) && $result['success']) {
+    back($result['message'] ?? 'Action completed successfully.');
+} else {
+    $errorMsg = $result['message'] ?? 'Unknown error';
+    if (strpos($errorMsg, 'CSRF') !== false) {
+        back('❌ Invalid security token.');
+    } elseif (strpos($errorMsg, 'VALIDATION') !== false) {
+        back('❌ ' . $errorMsg);
+    } else {
+        back('❌ ' . $errorMsg);
     }
-    back('❌ Prepare failed.');
-    break;
-  }
-
-  case 'reject': {
-    $reason = trim($_POST['reason'] ?? '');
-    $sql = "UPDATE users SET status='rejected', profile_status='rejected',
-                             rejection_reason=?, last_reviewed_by=?, last_reviewed_at=NOW()
-            WHERE id=?";
-    if ($st = $mysqli->prepare($sql)) {
-      $st->bind_param('sii', $reason, $me, $id);
-      $ok = $st->execute();
-      $st->close();
-      back($ok ? '❌ User rejected.' : '❌ DB error rejecting user.');
-    }
-    back('❌ Prepare failed.');
-    break;
-  }
-
-  case 'activate': {
-    $sql = "UPDATE users SET status='pending', profile_status='needs_update',
-                             last_reviewed_by=?, last_reviewed_at=NOW()
-            WHERE id=? AND status='rejected'";
-    if ($st = $mysqli->prepare($sql)) {
-      $st->bind_param('ii', $me, $id);
-      $ok = $st->execute();
-      $st->close();
-      back($ok ? '🔄 User re-activated (pending update).' : '❌ DB error activating user.');
-    }
-    back('❌ Prepare failed.');
-    break;
-  }
-
-  case 'promote': {
-    $sql = "UPDATE users SET is_admin=1, role='admin', promoted_by=?, promoted_at=NOW() WHERE id=?";
-    if ($st = $mysqli->prepare($sql)) {
-      $st->bind_param('ii', $me, $id);
-      $ok = $st->execute();
-      $st->close();
-      back($ok ? '⬆️ User promoted to admin.' : '❌ DB error promoting.');
-    }
-    back('❌ Prepare failed.');
-    break;
-  }
-
-  case 'demote': {
-    $sql = "UPDATE users SET is_admin=0, role='user' WHERE id=?";
-    if ($st = $mysqli->prepare($sql)) {
-      $st->bind_param('i', $id);
-      $ok = $st->execute();
-      $st->close();
-      back($ok ? '⬇️ Admin demoted to user.' : '❌ DB error demoting.');
-    }
-    back('❌ Prepare failed.');
-    break;
-  }
-
-  case 'delete': {
-    $sql = "DELETE FROM users WHERE id=?";
-    if ($st = $mysqli->prepare($sql)) {
-      $st->bind_param('i', $id);
-      $ok = $st->execute();
-      $st->close();
-      back($ok ? '🗑 User deleted.' : '❌ DB error deleting user.');
-    }
-    back('❌ Prepare failed.');
-    break;
-  }
-
-  default:
-    back('❌ Unknown action.');
 }

@@ -26,110 +26,146 @@ if (!$model) {
     exit;
 }
 
-// Handle POST actions
+// 🔁 API Integration: replaced direct DB with /api/admin/enrollment/list.php
+// Handle POST actions through API endpoints
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
     $action = $_POST['action'];
-
-    if (!validate_csrf($_POST['csrf'] ?? '')) {
-        $_SESSION['flash'] = 'CSRF token invalid';
-        header("Location: /admin/mtm_participants.php?model_id={$model_id}");
-        exit;
-    }
-
+    
+    // 🔁 API Integration: replacing form-based approval workflow
     if ($action === 'approve' && isset($_POST['enrollment_id'])) {
         $enrollment_id = (int)$_POST['enrollment_id'];
-
-        // Check if user already has approved enrollment
-        $stmt = $mysqli->prepare("
-            SELECT e.id FROM mtm_enrollments e
-            JOIN mtm_enrollments e2 ON e.user_id = e2.user_id AND e2.status = 'approved'
-            WHERE e.id = ? AND e.status = 'pending'
-        ");
-        $stmt->bind_param('i', $enrollment_id);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        if ($result && $result->num_rows > 0) {
-            $_SESSION['flash'] = 'User already has an approved MTM enrollment';
-            header("Location: /admin/mtm_participants.php?model_id={$model_id}");
-            exit;
+        $admin_notes = trim($_POST['admin_notes'] ?? '');
+        
+        // Make API call to approve enrollment
+        $apiData = [
+            'enrollment_id' => $enrollment_id,
+            'admin_notes' => $admin_notes
+        ];
+        
+        $response = make_admin_api_call('/api/admin/enrollment/approve.php', $apiData);
+        
+        if ($response && $response['success']) {
+            $_SESSION['flash'] = 'Enrollment approved successfully';
+        } else {
+            $errorMsg = $response['message'] ?? 'Failed to approve enrollment';
+            $_SESSION['flash'] = $errorMsg;
         }
-        $stmt->close();
-
-        // Approve enrollment
-        $stmt = $mysqli->prepare("UPDATE mtm_enrollments SET status = 'approved', approved_at = NOW(), joined_at = NOW() WHERE id = ?");
-        $stmt->bind_param('i', $enrollment_id);
-        $stmt->execute();
-        $stmt->close();
-
-        // Initialize task progress
-        require_once __DIR__ . '/../system/mtm_verifier.php';
-        mtm_initialize_task_progress($mysqli, $enrollment_id);
-
-        $_SESSION['flash'] = 'Enrollment approved successfully';
-
+        
+        header("Location: /admin/mtm_participants.php?model_id={$model_id}&" . ($response && $response['success'] ? 'msg=approved' : 'err=approve_failed'));
+        exit;
+        
     } elseif ($action === 'reject' && isset($_POST['enrollment_id'])) {
         $enrollment_id = (int)$_POST['enrollment_id'];
         $reason = trim($_POST['reason'] ?? '');
-
-        $stmt = $mysqli->prepare("UPDATE mtm_enrollments SET status = 'rejected', rejected_at = NOW() WHERE id = ?");
-        $stmt->bind_param('i', $enrollment_id);
-        $stmt->execute();
-        $stmt->close();
-
-        $_SESSION['flash'] = 'Enrollment rejected';
-
+        
+        // Make API call to reject enrollment
+        $apiData = [
+            'enrollment_id' => $enrollment_id,
+            'reason' => $reason
+        ];
+        
+        $response = make_admin_api_call('/api/admin/enrollment/reject.php', $apiData);
+        
+        if ($response && $response['success']) {
+            $_SESSION['flash'] = 'Enrollment rejected successfully';
+        } else {
+            $errorMsg = $response['message'] ?? 'Failed to reject enrollment';
+            $_SESSION['flash'] = $errorMsg;
+        }
+        
+        header("Location: /admin/mtm_participants.php?model_id={$model_id}&" . ($response && $response['success'] ? 'msg=rejected' : 'err=reject_failed'));
+        exit;
+        
     } elseif ($action === 'drop' && isset($_POST['enrollment_id'])) {
         $enrollment_id = (int)$_POST['enrollment_id'];
-
-        $stmt = $mysqli->prepare("UPDATE mtm_enrollments SET status = 'dropped' WHERE id = ?");
-        $stmt->bind_param('i', $enrollment_id);
-        $stmt->execute();
-        $stmt->close();
-
-        $_SESSION['flash'] = 'Participant dropped from MTM';
+        
+        // Make API call to drop participant
+        $apiData = [
+            'enrollment_id' => $enrollment_id
+        ];
+        
+        $response = make_admin_api_call('/api/admin/enrollment/drop.php', $apiData);
+        
+        if ($response && $response['success']) {
+            $_SESSION['flash'] = 'Participant dropped from MTM';
+        } else {
+            $errorMsg = $response['message'] ?? 'Failed to drop participant';
+            $_SESSION['flash'] = $errorMsg;
+        }
+        
+        header("Location: /admin/mtm_participants.php?model_id={$model_id}&" . ($response && $response['success'] ? 'msg=dropped' : 'err=drop_failed'));
+        exit;
     }
-
+    
     header("Location: /admin/mtm_participants.php?model_id={$model_id}");
     exit;
 }
 
-// Fetch enrollments
-$stmt = $mysqli->prepare("
-    SELECT
-        e.*,
-        COALESCE(u.name, u.email) as user_name,
-        u.email,
-        COUNT(tp.id) as total_tasks,
-        COUNT(CASE WHEN tp.status IN ('passed', 'failed') THEN 1 END) as completed_tasks,
-        COUNT(CASE WHEN tp.status = 'passed' THEN 1 END) as passed_tasks,
-        COUNT(CASE WHEN tp.status = 'unlocked' THEN 1 END) as unlocked_tasks
-    FROM mtm_enrollments e
-    JOIN users u ON e.user_id = u.id
-    LEFT JOIN mtm_task_progress tp ON e.id = tp.enrollment_id
-    WHERE e.model_id = ?
-    GROUP BY e.id
-    ORDER BY
-        CASE e.status
-            WHEN 'pending' THEN 1
-            WHEN 'approved' THEN 2
-            WHEN 'rejected' THEN 3
-            WHEN 'dropped' THEN 4
-            WHEN 'completed' THEN 5
-        END,
-        e.requested_at DESC
-");
-$stmt->bind_param('i', $model_id);
-$stmt->execute();
-$result = $stmt->get_result();
-$enrollments = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
-$stmt->close();
+// 🔁 API Integration: helper function for admin API calls
+function make_admin_api_call($endpoint, $data) {
+    // 🔁 API Integration: CSRF protection for mutating operations
+    $csrf = get_csrf_token();
+    $data['csrf_token'] = $csrf;
+    
+    $url = $_SERVER['HTTP_HOST'] . $endpoint;
+    $options = [
+        'http' => [
+            'method' => 'POST',
+            'header' => [
+                'Content-Type: application/json',
+                'User-Agent: Admin-Panel/1.0'
+            ],
+            'content' => json_encode($data)
+        ]
+    ];
+    
+    $context = stream_context_create($options);
+    $response = file_get_contents('http://' . $url, false, $context);
+    
+    if ($response === false) {
+        return ['success' => false, 'message' => 'API call failed'];
+    }
+    
+    $decoded = json_decode($response, true);
+    return $decoded;
+}
 
-// Group enrollments by status
-$pending = array_filter($enrollments, fn($e) => $e['status'] === 'pending');
-$approved = array_filter($enrollments, fn($e) => $e['status'] === 'approved');
-$rejected = array_filter($enrollments, fn($e) => $e['status'] === 'rejected');
-$dropped = array_filter($enrollments, fn($e) => $e['status'] === 'dropped');
-$completed = array_filter($enrollments, fn($e) => $e['status'] === 'completed');
+// 🔁 API Integration: replaced direct DB with /api/admin/enrollment/list.php
+// Fetch enrollments through API endpoint
+$enrollments = [];
+$groupedEnrollments = [
+    'pending' => [],
+    'approved' => [],
+    'rejected' => [],
+    'dropped' => [],
+    'completed' => []
+];
+
+try {
+    $url = $_SERVER['HTTP_HOST'] . '/api/admin/enrollment/list.php?model_id=' . $model_id . '&limit=1000';
+    $response = file_get_contents('http://' . $url);
+    
+    if ($response) {
+        $decoded = json_decode($response, true);
+        if ($decoded && isset($decoded['success']) && $decoded['success']) {
+            $apiEnrollments = $decoded['data']['enrollments'] ?? [];
+            
+            // Convert API response to expected format
+            $enrollments = $apiEnrollments['all'] ?? [];
+            $groupedEnrollments = $apiEnrollments;
+        }
+    }
+} catch (Exception $e) {
+    // Fallback to empty array if API call fails
+    $_SESSION['flash'] = 'Warning: Could not load enrollments from API';
+}
+
+// 🔁 API Integration: grouped enrollments already provided by API endpoint
+$pending = $groupedEnrollments['pending'];
+$approved = $groupedEnrollments['approved'];
+$rejected = $groupedEnrollments['rejected'];
+$dropped = $groupedEnrollments['dropped'];
+$completed = $groupedEnrollments['completed'];
 
 // Flash message
 $flash = $_SESSION['flash'] ?? '';
@@ -515,11 +551,11 @@ include __DIR__ . '/../header.php';
                                 </div>
                             <?php endif; ?>
                             <div>
-                                <strong>Email:</strong> <?= htmlspecialchars($enrollment['email']) ?>
+                                <strong>Email:</strong> <?= htmlspecialchars($enrollment['user_email']) ?>
                             </div>
                             <?php if ($enrollment['status'] === 'approved'): ?>
                                 <div>
-                                    <strong>Progress:</strong> <?= (int)$enrollment['passed_tasks'] ?>/<?= (int)$enrollment['total_tasks'] ?> tasks completed
+                                    <strong>Progress:</strong> <?= (int)($enrollment['task_progress']['passed'] ?? 0) ?>/<?= (int)($enrollment['task_progress']['total'] ?? 0) ?> tasks completed
                                 </div>
                             <?php endif; ?>
                         </div>

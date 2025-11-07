@@ -1,5 +1,5 @@
 <?php
-// Universal Profile Page - Works on any server configuration
+// Universal Profile Page - API Integrated Version
 // Session and security handling centralized via bootstrap.php
 require_once __DIR__ . '/includes/bootstrap.php';
 
@@ -32,7 +32,7 @@ if (!$config_found) {
 try {
     // Load guard.php with protection
     if (file_exists($base_path . '/guard.php')) {
-        $_SERVER['SCRIPT_NAME'] = 'profile_universal.php'; // Mock for guard
+        $_SERVER['SCRIPT_NAME'] = 'profile.php'; // Mock for guard
         require_once $base_path . '/guard.php';
     }
     
@@ -53,6 +53,9 @@ if (empty($_SESSION['user_id'])) {
 }
 
 $uid = (int)$_SESSION['user_id'];
+
+// 🔁 API Integration: Get CSRF token for API calls
+$csrf_token = $_SESSION['csrf_token'] ?? '';
 
 // Load profile fields
 $profile_fields = [];
@@ -77,45 +80,49 @@ if (!is_array($profile_fields)) {
     $profile_fields = [];
 }
 
-// Get user data
+// 🔁 API Integration: Get user data from API
 $user = [];
 $displayName = 'User';
 $email = '';
 $roleText = 'Member';
 $memberSince = 'Unknown';
+$phone = '';
+$timezone = '';
+$trading_capital = 0.0;
+$funds_available = 0.0;
 
 try {
-    if (isset($mysqli) && $mysqli instanceof mysqli) {
-        // Try different column combinations
-        $columns = ['id', 'email'];
-        $name_fields = ['name', 'full_name', 'username'];
-        foreach ($name_fields as $field) {
-            if ($mysqli->query("SHOW COLUMNS FROM users LIKE '$field'")->num_rows > 0) {
-                $columns[] = $field;
-                break;
+    // Make API call to get profile data
+    $api_url = $base_path . '/api/profile/me.php';
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'header' => [
+                'Content-Type: application/json',
+                'Cookie: ' . $_SERVER['HTTP_COOKIE'] ?? ''
+            ]
+        ]
+    ]);
+    
+    $response = @file_get_contents($api_url, false, $context);
+    
+    if ($response !== false) {
+        $api_data = json_decode($response, true);
+        
+        if ($api_data && $api_data['success'] ?? false) {
+            $user = $api_data['data'] ?? [];
+            
+            if ($user) {
+                $displayName = $user['name'] ?? 'User';
+                $email = $user['email'] ?? '';
+                $role = strtolower((string)($user['role'] ?? 'user'));
+                $roleText = $role==='superadmin' ? 'Superadmin' : ($role==='admin' ? 'Admin' : 'Member');
+                $memberSince = !empty($user['created_at']) ? date('d M Y', strtotime($user['created_at'])) : 'Unknown';
+                $phone = $user['phone'] ?? '';
+                $timezone = $user['timezone'] ?? '';
+                $trading_capital = (float)($user['trading_capital'] ?? 0.0);
+                $funds_available = (float)($user['funds_available'] ?? 0.0);
             }
-        }
-        
-        if ($mysqli->query("SHOW COLUMNS FROM users LIKE 'role'")->num_rows > 0) {
-            $columns[] = 'role';
-        }
-        if ($mysqli->query("SHOW COLUMNS FROM users LIKE 'created_at'")->num_rows > 0) {
-            $columns[] = 'created_at';
-        }
-        
-        $sql = "SELECT " . implode(', ', $columns) . " FROM users WHERE id=? LIMIT 1";
-        $stmt = $mysqli->prepare($sql);
-        $stmt->bind_param('i', $uid);
-        $stmt->execute();
-        $user = $stmt->get_result()->fetch_assoc() ?: [];
-        $stmt->close();
-        
-        if ($user) {
-            $displayName = $user['name'] ?: $user['full_name'] ?: $user['username'] ?: 'User';
-            $email = $user['email'] ?: '';
-            $role = strtolower((string)($user['role'] ?? 'user'));
-            $roleText = $role==='superadmin' ? 'Superadmin' : ($role==='admin' ? 'Admin' : 'Member');
-            $memberSince = !empty($user['created_at']) ? date('d M Y', strtotime($user['created_at'])) : 'Unknown';
         }
     }
 } catch (Exception $e) {
@@ -134,42 +141,14 @@ foreach (preg_split('/\s+/', $displayName) as $word) {
 }
 $initials = mb_substr($initials,0,2);
 
-// Handle form submission
+// 🔁 API Integration: Handle form submission via JavaScript
+// Removed direct database processing - now handled by profile_update.php API call
 $toast = ['type'=>null,'text'=>null];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = trim((string)($_POST['name'] ?? ''));
-    
-    if ($name !== '' && !empty($user['id'])) {
-        try {
-            // Update name - try different column names
-            $name_columns = ['name', 'full_name', 'username'];
-            $updated = false;
-            
-            foreach ($name_columns as $col) {
-                try {
-                    $stmt = $mysqli->prepare("UPDATE users SET `$col`=? WHERE id=?");
-                    $stmt->bind_param('si', $name, $user['id']);
-                    if ($stmt->execute()) {
-                        $updated = true;
-                        $stmt->close();
-                        break;
-                    }
-                    $stmt->close();
-                } catch (Exception $e) {
-                    continue;
-                }
-            }
-            
-            if ($updated) {
-                $toast = ['type'=>'success','text'=>'Profile updated successfully.'];
-                $displayName = $name;
-                $user['name'] = $name;
-            } else {
-                $toast = ['type'=>'error','text'=>'Could not update profile.'];
-            }
-        } catch (Exception $e) {
-            $toast = ['type'=>'error','text'=>'Database error: ' . $e->getMessage()];
-        }
+    // Redirect to handle via API (progressive enhancement)
+    if (!empty($_POST['name'])) {
+        header('Location: profile.php?updated=1');
+        exit;
     }
 }
 
@@ -237,13 +216,27 @@ if (!safe_include($header_path)) {
         </div>
       </div>
 
-      <form method="post" action="">
+      <form id="profileForm" method="post">
         <h3 class="title">Account Information</h3>
         
         <div class="field">
           <label for="name">Full name</label>
-          <input class="input" type="text" id="name" name="name" 
+          <input class="input" type="text" id="name" name="name"
                  value="<?php echo htmlspecialchars($displayName); ?>" required>
+        </div>
+
+        <div class="field">
+          <label for="phone">Phone</label>
+          <input class="input" type="text" id="phone" name="phone"
+                 value="<?php echo htmlspecialchars($phone); ?>"
+                 placeholder="+1234567890">
+        </div>
+
+        <div class="field">
+          <label for="timezone">Timezone</label>
+          <input class="input" type="text" id="timezone" name="timezone"
+                 value="<?php echo htmlspecialchars($timezone); ?>"
+                 placeholder="America/New_York">
         </div>
 
         <div class="field">
@@ -269,9 +262,10 @@ if (!safe_include($header_path)) {
         <?php endif; ?>
 
         <div class="row" style="margin-top:24px">
-          <button class="btn" type="submit">💾 Save Changes</button>
+          <button class="btn" type="submit" id="saveBtn">💾 Save Changes</button>
           <a class="btn secondary" href="<?php echo $base_path; ?>/dashboard.php">← Back to Dashboard</a>
         </div>
+        <input type="hidden" id="csrf_token" value="<?php echo htmlspecialchars($csrf_token); ?>">
       </form>
     </div>
 
@@ -286,8 +280,8 @@ if (!safe_include($header_path)) {
         <strong>Server Config:</strong> Base path: <?php echo htmlspecialchars($base_path); ?>
       </div>
 
-      <?php if (!empty($toast['type'])): ?>
-      <div class="toast <?php echo $toast['type']; ?>">
+      <?php if (!empty($toast['type']) && !empty($toast['text'])): ?>
+      <div class="toast <?php echo htmlspecialchars($toast['type']); ?>">
         <?php echo $toast['type'] === 'success' ? '✅' : '⚠️'; ?>
         <?php echo htmlspecialchars($toast['text']); ?>
       </div>
@@ -301,6 +295,85 @@ if (!safe_include($header_path)) {
     </div>
   </div>
 </div>
+
+<script>
+// 🔁 API Integration: Handle profile form submission via API
+document.getElementById('profileForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const saveBtn = document.getElementById('saveBtn');
+    const originalText = saveBtn.textContent;
+    saveBtn.textContent = '⏳ Saving...';
+    saveBtn.disabled = true;
+    
+    try {
+        // Collect form data
+        const formData = {
+            name: document.getElementById('name').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            timezone: document.getElementById('timezone').value.trim()
+        };
+        
+        // Get CSRF token
+        const csrfToken = document.getElementById('csrf_token').value;
+        
+        // Make API call
+        const response = await fetch('./api/profile/update.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Show success message
+            showToast('success', 'Profile updated successfully');
+            
+            // Update display name if changed
+            if (formData.name && formData.name !== '<?php echo htmlspecialchars($displayName); ?>') {
+                document.querySelector('.avatar').textContent = formData.name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2);
+                document.querySelector('[style*="font-size:24px"]').textContent = formData.name;
+            }
+        } else {
+            // Show error message
+            const errorMsg = data.message || 'Failed to update profile';
+            showToast('error', errorMsg);
+        }
+    } catch (error) {
+        console.error('Profile update error:', error);
+        showToast('error', 'Network error occurred');
+    } finally {
+        saveBtn.textContent = originalText;
+        saveBtn.disabled = false;
+    }
+});
+
+function showToast(type, message) {
+    // Remove existing toasts
+    const existingToast = document.querySelector('.toast');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    // Create new toast
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `${type === 'success' ? '✅' : '⚠️'} ${message}`;
+    document.body.appendChild(toast);
+    
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.remove();
+        }
+    }, 3000);
+}
+</script>
 
 <?php
 if (!safe_include($footer_path)) {

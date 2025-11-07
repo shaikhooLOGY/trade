@@ -119,137 +119,18 @@ $js_available_funds = $available;
 $errors = array();
 $saved = false;
 
+// 🔁 API Integration: Form submission now handled via JavaScript fetch to /api/trades/create.php
+// Server-side processing removed - moved to API endpoint for better separation of concerns
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Basic validation
-    $symbol   = strtoupper(trim((string)($_POST['symbol'] ?? '')));
-    $pos_pct  = fnum($_POST['position_percent'] ?? '');
-    $entry    = fnum($_POST['entry_price'] ?? '');
-    $sl       = fnum($_POST['stop_loss'] ?? '');
-    $tgt      = fnum($_POST['target_price'] ?? '');
-    
-    if ($symbol === '') $errors[] = 'Symbol is required.';
-    if ($pos_pct === null || $pos_pct <= 0 || $pos_pct > 100) $errors[] = 'Position % must be between 0 and 100.';
-    if ($entry === null || $entry <= 0) $errors[] = 'Entry price is required.';
-    if ($sl === null || $sl <= 0) $errors[] = 'Stop loss is required.';
-    if ($tgt === null || $tgt <= 0) $errors[] = 'Target price is required.';
-    
-    // Server-side available funds check
-    if ($available <= 0) {
-        $errors[] = 'You do not have sufficient available funds to create a new trade.';
-    } elseif ($pos_pct > 0) {
-        $trade_cost = ($tot_cap * $pos_pct) / 100;
-        if ($trade_cost > $available) {
-            $errors[] = 'Position size (' . number_format($pos_pct, 2) . '%) requires ₹' . number_format($trade_cost, 2) . ' but only ₹' . number_format($available, 2) . ' available.';
-        }
-    }
-    
-    if (empty($errors)) {
-        // Build dynamic INSERT query based on available columns
-        $cols = array();
-        $vals = array();
-        $types = '';
-        
-        // Always available columns
-        if (has_col($mysqli, 'trades', 'user_id')) {
-            $cols[] = 'user_id';
-            $vals[] = $uid;
-            $types .= 'i';
-        }
-        
-        if (has_col($mysqli, 'trades', 'symbol')) {
-            $cols[] = 'symbol';
-            $vals[] = $symbol;
-            $types .= 's';
-        }
-        
-        // Check for position percentage column (different names)
-        if (has_col($mysqli, 'trades', 'position_percent')) {
-            $cols[] = 'position_percent';
-            $vals[] = $pos_pct;
-            $types .= 'd';
-        } elseif (has_col($mysqli, 'trades', 'risk_pct')) {
-            $cols[] = 'risk_pct';
-            $vals[] = $pos_pct;
-            $types .= 'd';
-        }
-        
-        // Required numeric columns
-        if (has_col($mysqli, 'trades', 'entry_price')) {
-            $cols[] = 'entry_price';
-            $vals[] = $entry;
-            $types .= 'd';
-        }
-        
-        if (has_col($mysqli, 'trades', 'stop_loss')) {
-            $cols[] = 'stop_loss';
-            $vals[] = $sl;
-            $types .= 'd';
-        }
-        
-        if (has_col($mysqli, 'trades', 'target_price')) {
-            $cols[] = 'target_price';
-            $vals[] = $tgt;
-            $types .= 'd';
-        }
-        
-        // Optional date columns
-        if (has_col($mysqli, 'trades', 'entry_date')) {
-            $cols[] = 'entry_date';
-            $vals[] = date('Y-m-d');
-            $types .= 's';
-        } elseif (has_col($mysqli, 'trades', 'created_at')) {
-            $cols[] = 'created_at';
-            $vals[] = date('Y-m-d H:i:s');
-            $types .= 's';
-        }
-        
-        // Optional columns
-        if (has_col($mysqli, 'trades', 'analysis_link')) {
-            $alink = trim((string)($_POST['analysis_link'] ?? ''));
-            if ($alink !== '') {
-                $cols[] = 'analysis_link';
-                $vals[] = $alink;
-                $types .= 's';
-            }
-        }
-        
-        if (has_col($mysqli, 'trades', 'notes')) {
-            $notes = trim((string)($_POST['notes'] ?? ''));
-            if ($notes !== '') {
-                $cols[] = 'notes';
-                $vals[] = $notes;
-                $types .= 's';
-            }
-        }
-        
-        // Execute INSERT only if we have minimum required columns
-        if (count($cols) >= 2) { // At least user_id and symbol
-            $colSql = '`' . implode('`,`', $cols) . '`';
-            $ph = rtrim(str_repeat('?,', count($cols)), ',');
-            
-            if ($stmt = $mysqli->prepare("INSERT INTO trades ({$colSql}) VALUES ({$ph})")) {
-                $stmt->bind_param($types, ...$vals);
-                if ($stmt->execute()) {
-                    $saved = true;
-                    // Update available funds after successful trade creation
-                    $new_available = $available - ($tot_cap * $pos_pct / 100);
-                    if (has_col($mysqli, 'users', 'funds_available')) {
-                        $update_stmt = $mysqli->prepare("UPDATE users SET funds_available = ? WHERE id = ?");
-                        $update_stmt->bind_param('di', $new_available, $uid);
-                        $update_stmt->execute();
-                        $update_stmt->close();
-                    }
-                } else {
-                    $errors[] = 'Database error: ' . $mysqli->error;
-                }
-                $stmt->close();
-            } else {
-                $errors[] = 'Failed to prepare statement. Available columns: ' . implode(', ', $cols);
-            }
-        } else {
-            $errors[] = 'Insufficient database columns available for trade creation.';
-        }
-    }
+    // API Integration: This block is now handled client-side via JavaScript
+    // Keeping minimal server-side handling for fallback
+    header('Content-Type: application/json');
+    echo json_encode([
+        'success' => false,
+        'message' => 'Please use the JavaScript form submission',
+        'redirect' => '/trade_new.php'
+    ]);
+    exit;
 }
 
 include __DIR__ . '/header.php';
@@ -304,7 +185,10 @@ textarea{min-height:96px;resize:vertical}
             <p style="margin:0;font-size:14px;color:#4a5568;">This trade stays outside MTM programs and only impacts your personal analytics.</p>
         </div>
         
-        <form method="post">
+        <form id="tradeForm" method="post">
+            <!-- CSRF Token for API Integration -->
+            <input type="hidden" name="csrf" value="<?= htmlspecialchars($_SESSION['csrf'] ?? '') ?>">
+            
             <div class="form-grid">
                 <div class="form-row">
                     <label>Entry Date</label>
@@ -441,6 +325,106 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initial calculation with real balance
     calculateTradeMetrics();
+});
+</script>
+
+<script>
+// 🔁 API Integration: Form submission via JavaScript fetch to /api/trades/create.php
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('tradeForm');
+    if (form) {
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Get CSRF token
+            const csrfToken = document.querySelector('input[name="csrf"]').value;
+            
+            // Collect form data
+            const formData = new FormData(form);
+            const positionPercent = parseFloat(formData.get('position_percent')) || 0;
+            const entryPrice = parseFloat(formData.get('entry_price')) || 0;
+            const totalCapital = <?php echo json_encode($js_total_capital); ?>;
+            
+            // 🔁 API Integration: Map form fields to API expectations
+            const tradeData = {
+                symbol: formData.get('symbol'),
+                quantity: Math.round((totalCapital * positionPercent) / 100 / entryPrice) || 1, // Calculate quantity
+                entry_price: entryPrice,
+                stop_loss: parseFloat(formData.get('stop_loss')) || null,
+                target_price: parseFloat(formData.get('target_price')) || null,
+                allocation_amount: (totalCapital * positionPercent) / 100, // Calculate allocation amount
+                analysis_link: formData.get('analysis_link') || null,
+                notes: formData.get('notes') || null
+            };
+            
+            // Get submit button
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
+            try {
+                // Show loading state
+                submitBtn.textContent = '⏳ Creating...';
+                submitBtn.disabled = true;
+                
+                // Make API call
+                const response = await fetch('/api/trades/create.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-Token': csrfToken
+                    },
+                    body: JSON.stringify(tradeData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Show success message
+                    const successDiv = document.createElement('div');
+                    successDiv.className = 'success';
+                    successDiv.innerHTML = '✅ Trade created successfully! <a href="dashboard.php">View Dashboard</a>';
+                    
+                    // Replace form with success message
+                    const card = document.querySelector('.card');
+                    card.innerHTML = successDiv.outerHTML;
+                    
+                    // Scroll to top to show success message
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                } else {
+                    // Show error message
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'error';
+                    errorDiv.innerHTML = `<strong>Error:</strong> ${data.message || data.error || 'Unknown error'}`;
+                    
+                    // Insert error at the top
+                    const wrap = document.querySelector('.wrap');
+                    wrap.insertBefore(errorDiv, wrap.firstChild);
+                    
+                    // Scroll to show error
+                    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                
+            } catch (error) {
+                console.error('Trade creation error:', error);
+                
+                // Show error message
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error';
+                errorDiv.innerHTML = `<strong>Error:</strong> Network error. Please try again.`;
+                
+                // Insert error at the top
+                const wrap = document.querySelector('.wrap');
+                wrap.insertBefore(errorDiv, wrap.firstChild);
+                
+                // Scroll to show error
+                errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } finally {
+                // Restore button state
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        });
+    }
 });
 </script>
 

@@ -325,27 +325,17 @@ function require_admin_json(string $message = ''): bool {
         return true;
     }
 
-    // Debug: Check session data
+    // Check session data
     $sessionUserId = $_SESSION['user_id'] ?? null;
     $sessionIsAdmin = $_SESSION['is_admin'] ?? 0;
     
-    // Force debug output to be visible
-    echo "<!-- DEBUG: require_admin_json - user_id=" . json_encode($sessionUserId) . ", is_admin=" . json_encode($sessionIsAdmin) . ", empty(user_id)=" . (empty($sessionUserId) ? 'true' : 'false') . " -->" . PHP_EOL;
-    flush();
-    
     // Check authentication first - return 401 if not authenticated
     if (empty($sessionUserId)) {
-        echo "<!-- DEBUG: Returning 401 - Authentication required -->" . PHP_EOL;
-        flush();
-        // Force 401 status code directly
-        http_response_code(401);
-        json_error("UNAUTHORIZED", $message ?: "Authentication required", null, 401);
+        json_error('UNAUTHORIZED', $message ?: 'Authentication required', null, 401);
     }
     
     // Check admin privileges - return 403 if authenticated but not admin
     if (empty($sessionIsAdmin)) {
-        echo "<!-- DEBUG: Returning 403 - Admin privileges required -->" . PHP_EOL;
-        flush();
         // Log unauthorized admin access attempt
         if (function_exists('log_security_event')) {
             log_security_event('unauthorized_admin_access', 'Admin access attempted without proper privileges', [
@@ -359,9 +349,7 @@ function require_admin_json(string $message = ''): bool {
                 'status' => 'failure'
             ]);
         }
-        // Force 403 status code directly
-        http_response_code(403);
-        json_error("FORBIDDEN", $message ?: "Admin privileges required", null, 403);
+        json_error('FORBIDDEN', $message ?: 'Admin privileges required', null, 403);
     }
     
     return true;

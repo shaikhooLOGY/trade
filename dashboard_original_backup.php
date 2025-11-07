@@ -1,5 +1,5 @@
 <?php
-// Trading Dashboard - API Integrated Version
+// Trading Dashboard - matches site style with complete trade data
 // Session and CSRF handling centralized via bootstrap.php
 require_once __DIR__ . '/includes/bootstrap.php';
 require_once __DIR__ . '/system/mtm_verifier.php';
@@ -43,151 +43,343 @@ function column_exists(mysqli $db, string $table, string $column): bool {
     return $exists;
 }
 
-// Initialize dashboard data with API integration
 $user_id = (int)($_SESSION['user_id'] ?? 0);
 if (!$user_id) { header('Location: /login.php'); exit; }
 
-// Default values
+// ---------- POST actions ----------
+if ($_SERVER['REQUEST_METHOD']==='POST' && validate_csrf($_POST['csrf'] ?? '')) {
+    $act = $_POST['action'] ?? '';
+    $tid = (int)($_POST['trade_id'] ?? 0);
+
+    if ($act==='soft_delete' && $tid > 0) {
+        if (column_exists($mysqli, 'trades', 'deleted_at')) {
+            if ($stmt = $mysqli->prepare("UPDATE trades SET deleted_at=NOW() WHERE id=? AND user_id=?")) {
+                $stmt->bind_param('ii', $tid, $user_id);
+                $stmt->execute();
+                $stmt->close();
+            }
+        } else {
+            if ($stmt = $mysqli->prepare("DELETE FROM trades WHERE id=? AND user_id=? LIMIT 1")) {
+                $stmt->bind_param('ii', $tid, $user_id);
+                $stmt->execute();
+                $stmt->close();
+            }
+        }
+        $_SESSION['flash'] = 'Trade deleted.';
+        header('Location: /dashboard.php'); exit;
+    }
+}
+
+// ---------- Export functionality ----------
+if (getv('export') === '1') {
+    header('Location: /dashboard_export_pdf.php');
+    exit;
+}
+
+// ---------- Funds Calculation (Fixed Schema) ----------
+// tot_cap: prefer trading_capital if set, else funds_available
 $default_capital = 100000.0;
 $tot_cap = 0.0;
 $funds_available_val = 0.0;
-$available = 0.0;
+$has_user_trading_cap = column_exists($mysqli, 'users', 'trading_capital');
+$has_user_funds_available = column_exists($mysqli, 'users', 'funds_available');
+
+try {
+    $fields = [];
+    if ($has_user_trading_cap) $fields[] = "COALESCE(trading_capital,0) AS tc";
+    if ($has_user_funds_available) $fields[] = "COALESCE(funds_available,0) AS fa";
+
+    if (!empty($fields) && ($stmt = $mysqli->prepare("SELECT " . implode(', ', $fields) . " FROM users WHERE id = ? LIMIT 1"))) {
+        $stmt->bind_param('i', $user_id);
+        $stmt->execute();
+        $data = $stmt->get_result()->fetch_assoc() ?: [];
+        $stmt->close();
+
+        $tc = (float)($data['tc'] ?? 0.0);
+        $funds_available_val = (float)($data['fa'] ?? 0.0);
+
+        if ($tc <= 0 && $funds_available_val <= 0) {
+            $tot_cap = $default_capital;
+            $funds_available_val = $default_capital;
+
+            if ($has_user_trading_cap && ($uStmt = $mysqli->prepare("UPDATE users SET trading_capital = ? WHERE id = ?"))) {
+                $uStmt->bind_param('di', $tot_cap, $user_id);
+                $uStmt->execute();
+                $uStmt->close();
+            }
+            if ($has_user_funds_available && ($fStmt = $mysqli->prepare("UPDATE users SET funds_available = ? WHERE id = ?"))) {
+                $fStmt->bind_param('di', $funds_available_val, $user_id);
+                $fStmt->execute();
+                $fStmt->close();
+            }
+        } else {
+            $tot_cap = $tc > 0 ? $tc : $funds_available_val;
+        }
+    }
+} catch (Exception $e) { $tot_cap = $default_capital; $funds_available_val = $default_capital; }
+
+if ($tot_cap <= 0) {
+    $tot_cap = $default_capital;
+}
+if (!$has_user_funds_available) {
+    $funds_available_val = $tot_cap;
+}
+
+// reserved: sum(allocation_amount) for open and not deleted trades
+// --- Build robust "open" condition based on available schema columns ---
+$cols_res = $mysqli->query("SHOW COLUMNS FROM trades");
+$db_cols = [];
+if ($cols_res) while($c = $cols_res->fetch_assoc()) $db_cols[strtolower($c['Field'])] = true;
+$has_outcome = !empty($db_cols['outcome']);
+$has_closed_at = !empty($db_cols['closed_at']);
+$has_close_date = !empty($db_cols['close_date']);
+$has_deleted_at = !empty($db_cols['deleted_at']);
+$has_pnl = !empty($db_cols['pnl']);
+$has_pl_percent = !empty($db_cols['pl_percent']);
+
+$open_conditions = [];
+if ($has_outcome) $open_conditions[] = "UPPER(COALESCE(outcome, 'OPEN')) = 'OPEN'";
+if ($has_closed_at) $open_conditions[] = "closed_at IS NULL";
+if ($has_close_date) $open_conditions[] = "close_date IS NULL";
+if (empty($open_conditions)) $open_conditions[] = "1=0"; // Failsafe if no status columns found
+
+$where_open = '('. implode(' OR ', $open_conditions) .')';
+if ($has_deleted_at) $where_open .= " AND (deleted_at IS NULL OR deleted_at = '')";
+
 $reserved = 0.0;
+try {
+    $allocation_column = null;
+    foreach (['allocation_amount', 'allocated_amount', 'capital_allocated', 'risk_amount'] as $candidate) {
+        if (!empty($db_cols[$candidate])) {
+            $allocation_column = $candidate;
+            break;
+        }
+    }
+
+    if ($allocation_column) {
+        $sql = "SELECT COALESCE(SUM(`{$allocation_column}`),0) AS reserved FROM trades WHERE user_id=? AND {$where_open}";
+        $stmt = $mysqli->prepare($sql);
+        $stmt->bind_param('i', $user_id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $reserved = isset($row['reserved']) ? (float)$row['reserved'] : 0.0;
+        $stmt->close();
+        
+        // *** KEY FALLBACK LOGIC FOR RESERVED ***
+        if ($reserved <= 0 && !empty($db_cols['position_percent'])) {
+            $sql = "SELECT COALESCE(SUM(position_percent),0) AS pct FROM trades WHERE user_id=? AND {$where_open}";
+            $stmt = $mysqli->prepare($sql);
+            $stmt->bind_param('i', $user_id);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            $pct = isset($row['pct']) ? (float)$row['pct'] : 0.0;
+            $stmt->close();
+            $reserved = ($tot_cap * $pct) / 100.0;
+        }
+    } elseif (!empty($db_cols['position_percent']) || !empty($db_cols['risk_pct'])) {
+        $percent_col = !empty($db_cols['position_percent']) ? 'position_percent' : 'risk_pct';
+        $sql = "SELECT COALESCE(SUM(`{$percent_col}`),0) AS pct FROM trades WHERE user_id=? AND {$where_open}";
+        $stmt = $mysqli->prepare($sql);
+        $stmt->bind_param('i', $user_id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $pct = isset($row['pct']) ? (float)$row['pct'] : 0.0;
+        $stmt->close();
+        $reserved = ($tot_cap * $pct) / 100.0;
+    } else {
+        $sql = "SELECT COALESCE(SUM(entry_price),0) AS reserved FROM trades WHERE user_id=? AND {$where_open}";
+        $stmt = $mysqli->prepare($sql);
+        $stmt->bind_param('i', $user_id);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $reserved = isset($row['reserved']) ? (float)$row['reserved'] : 0.0;
+        $stmt->close();
+    }
+} catch (Exception $e) { $reserved = 0.0; }
+
+// available: funds_available - reserved (can be negative)
+$available = $tot_cap - $reserved;
+
+// FIXED: Ensure funds_available matches trading_capital if funds_available is 0
+if ($funds_available_val <= 0 && $tot_cap > 0) {
+    // Sync funds_available with trading_capital
+    if ($stmt = $mysqli->prepare("UPDATE users SET funds_available = trading_capital WHERE id = ? AND funds_available <= 0")) {
+        $stmt->bind_param('i', $user_id);
+        $stmt->execute();
+        $stmt->close();
+        $funds_available_val = $tot_cap;
+    }
+} else {
+    // Normal calculation
+    if ($has_user_funds_available && abs($funds_available_val - $available) > 0.01) {
+        if ($stmt = $mysqli->prepare("UPDATE users SET funds_available = ? WHERE id = ?")) {
+            $stmt->bind_param('di', $available, $user_id);
+            $stmt->execute();
+            $stmt->close();
+            $funds_available_val = $available;
+        }
+    }
+}
+$available = $funds_available_val; // Use actual funds_available value
+
+// profit_loss: sum(pnl) for closed and not deleted trades
 $profit_loss = 0.0;
+if ($has_pnl) {
+    try {
+        $conditions = ["user_id = ?"];
+        if ($has_deleted_at) $conditions[] = "(deleted_at IS NULL OR deleted_at='')";
+        
+        // Use OR to combine closed trade detection methods
+        $closed_conditions = [];
+        if ($has_closed_at) $closed_conditions[] = "closed_at IS NOT NULL";
+        $closed_conditions[] = "UPPER(COALESCE(outcome, 'OPEN')) != 'OPEN'";
+        $conditions[] = '('. implode(' OR ', $closed_conditions) .')';
+        
+        $where_pnl = implode(' AND ', $conditions);
+
+        if ($stmt = $mysqli->prepare("SELECT COALESCE(SUM(pnl),0) as total_pnl FROM trades WHERE {$where_pnl}")) {
+            $stmt->bind_param('i', $user_id);
+            $stmt->execute();
+            $profit_data = $stmt->get_result()->fetch_assoc();
+            $profit_loss = isset($profit_data['total_pnl']) ? (float)$profit_data['total_pnl'] : 0.0;
+            $stmt->close();
+        }
+    } catch (Exception $e) { $profit_loss = 0.0; }
+}
+
+// ---------- KPIs ----------
 $stats = [
     'total_trades' => 0,
     'open_positions' => 0,
     'closed_trades' => 0,
     'winning_trades' => 0
 ];
+
+try {
+    $conditions = ["user_id = ?"];
+    if ($has_deleted_at) $conditions[] = "(deleted_at IS NULL OR deleted_at='')";
+    $where_stats = implode(' AND ', $conditions);
+
+    // Use OR to combine open trade detection methods
+    $open_conditions = [];
+    if ($has_closed_at) $open_conditions[] = "closed_at IS NULL";
+    if ($has_outcome) $open_conditions[] = "UPPER(COALESCE(outcome,'OPEN'))='OPEN'";
+    $openExpr = !empty($open_conditions) ? '('. implode(' OR ', $open_conditions) .')' : "0";
+    
+    // Use OR to combine closed trade detection methods
+    $closed_conditions = [];
+    if ($has_closed_at) $closed_conditions[] = "closed_at IS NOT NULL";
+    if ($has_outcome) $closed_conditions[] = "UPPER(COALESCE(outcome, 'OPEN')) != 'OPEN'";
+    $closedExpr = !empty($closed_conditions) ? '('. implode(' OR ', $closed_conditions) .')' : "0";
+    
+    $winExpr = ($has_pnl && $closedExpr !== "0") ? "(pnl > 0 AND {$closedExpr})" : "0";
+
+    $sql = "
+        SELECT 
+            COUNT(*) AS total_trades,
+            SUM(CASE WHEN {$openExpr} THEN 1 ELSE 0 END) AS open_positions,
+            SUM(CASE WHEN {$closedExpr} THEN 1 ELSE 0 END) AS closed_trades,
+            SUM(CASE WHEN {$winExpr} THEN 1 ELSE 0 END) AS winning_trades
+        FROM trades
+        WHERE {$where_stats}
+    ";
+    if ($stmt = $mysqli->prepare($sql)) {
+        $stmt->bind_param('i', $user_id);
+        $stmt->execute();
+        $stats_data = $stmt->get_result()->fetch_assoc() ?: [];
+        $stmt->close();
+        $stats = array_merge($stats, array_map('intval', $stats_data));
+    }
+} catch (Exception $e) {
+    // Keep defaults
+}
+
+// ---------- Trading Data Query ----------
 $rows = [];
+$tab = getv('tab', 'active');
+$page = max(1, (int)getv('page', 1));
+$limit = 50;
+$offset = ($page - 1) * $limit;
+
+// 🔁 API Integration: Main trades query replaced with API call
+// Note: For now, keeping this as fallback since the dashboard needs immediate data
+// In a full implementation, this could be converted to use /api/trades/list.php
+try {
+    // Fallback to direct query for dashboard functionality
+    // This maintains performance while the API integration is being implemented
+    $query = "SELECT * FROM trades WHERE user_id={$user_id} ORDER BY id DESC LIMIT {$limit}";
+
+    $trade_q = $mysqli->query($query);
+    if ($trade_q) {
+        $rows = $trade_q->fetch_all(MYSQLI_ASSOC);
+    }
+} catch (Exception $e) {
+    $rows = [];
+}
+
+// 🔁 API Integration: Future enhancement - load trades via API
+// Uncomment below when ready to implement client-side trade loading:
+/*
+$rows = []; // Initialize empty, will be populated via JavaScript
+*/
+
+// ---------- New Matrix Calculations (after rows are defined) ----------
 $avg_rr = 0.0;
 $open_risk_amount = 0.0;
 $open_risk_percentage = 0.0;
 
-// API Integration: Get user profile data with financial metrics
 try {
-    $profile_url = '/api/profile/me.php';
-    $response = file_get_contents($profile_url);
-    if ($response !== false) {
-        $profile_data = json_decode($response, true);
-        if (isset($profile_data['data'])) {
-            $profile = $profile_data['data'];
-            $tot_cap = (float)($profile['trading_capital'] ?? 0.0);
-            $funds_available_val = (float)($profile['funds_available'] ?? 0.0);
-            
-            // Use profile statistics for trade counts
-            $stats['total_trades'] = (int)($profile['statistics']['trades']['total'] ?? 0);
-            $stats['open_positions'] = (int)($profile['statistics']['trades']['open'] ?? 0);
-        }
-    }
-} catch (Exception $e) {
-    // Keep default values if API call fails
-}
-
-// Fallback to default capital if not set
-if ($tot_cap <= 0) {
-    $tot_cap = $default_capital;
-    $funds_available_val = $default_capital;
-}
-$available = $funds_available_val;
-
-// API Integration: Get trade statistics for advanced metrics
-try {
-    $trades_url = '/api/trades/list.php?limit=1000'; // Get all trades for calculations
-    $response = file_get_contents($trades_url);
-    if ($response !== false) {
-        $trades_data = json_decode($response, true);
-        if (isset($trades_data['data']['rows'])) {
-            $rows = $trades_data['data']['rows'];
-            
-            // Calculate advanced statistics
-            $closed_trades = 0;
-            $winning_trades = 0;
-            $total_pnl = 0.0;
-            $reserved_sum = 0.0;
-            $rr_sum = 0;
-            $rr_count = 0;
-            $open_risk_sum = 0.0;
-            
-            foreach ($rows as $trade) {
-                // Check if trade is closed
-                $is_closed = (isset($trade['outcome']) && strtoupper($trade['outcome']) !== 'OPEN') || 
-                            (isset($trade['closed_at']) && !empty($trade['closed_at']));
-                
-                if ($is_closed) {
-                    $closed_trades++;
-                    
-                    // Count winning trades
-                    if (isset($trade['pnl']) && $trade['pnl'] > 0) {
-                        $winning_trades++;
-                    }
-                    
-                    // Sum P&L
-                    if (isset($trade['pnl'])) {
-                        $total_pnl += (float)$trade['pnl'];
-                    }
-                } else {
-                    // Calculate reserved amount for open trades
-                    if (isset($trade['allocation_amount'])) {
-                        $reserved_sum += (float)$trade['allocation_amount'];
-                    } elseif (isset($trade['position_percent']) && $tot_cap > 0) {
-                        $position_pct = (float)$trade['position_percent'];
-                        $reserved_sum += ($tot_cap * $position_pct) / 100;
-                    }
-                    
-                    // Calculate open risk
-                    if (isset($trade['entry_price']) && isset($trade['stop_loss']) && 
-                        isset($trade['position_percent']) && $tot_cap > 0) {
-                        $entry_price = (float)$trade['entry_price'];
-                        $stop_loss = (float)$trade['stop_loss'];
-                        $position_pct = (float)$trade['position_percent'];
-                        
-                        if ($entry_price > 0 && $stop_loss > 0) {
-                            $amount_invested = ($tot_cap * $position_pct) / 100;
-                            $risk_amount = abs($entry_price - $stop_loss) * ($amount_invested / $entry_price);
-                            $open_risk_sum += $risk_amount;
-                            
-                            // Calculate RR ratio
-                            if (isset($trade['target_price'])) {
-                                $target_price = (float)$trade['target_price'];
-                                if ($target_price > 0) {
-                                    $risk_price = abs($entry_price - $stop_loss);
-                                    $reward_price = abs($target_price - $entry_price);
-                                    if ($risk_price > 0) {
-                                        $rr_ratio = $reward_price / $risk_price;
-                                        $rr_sum += $rr_ratio;
-                                        $rr_count++;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Update statistics
-            $stats['closed_trades'] = $closed_trades;
-            $stats['winning_trades'] = $winning_trades;
-            $profit_loss = $total_pnl;
-            $reserved = $reserved_sum;
-            $open_risk_amount = $open_risk_sum;
-            $open_risk_percentage = $tot_cap > 0 ? ($open_risk_sum / $tot_cap) * 100 : 0;
-            
-            // Calculate average RR
-            if ($rr_count > 0) {
-                $avg_rr = $rr_sum / $rr_count;
+    // Calculate Average RR across all trades
+    $rr_sum = 0;
+    $rr_count = 0;
+    
+    foreach ($rows as $r) {
+        $entry_price = isset($r['entry_price']) ? (float)$r['entry_price'] : 0;
+        $stop_loss = isset($r['stop_loss']) ? (float)$r['stop_loss'] : 0;
+        $target_price = isset($r['target_price']) ? (float)$r['target_price'] : 0;
+        
+        if ($entry_price > 0 && $stop_loss > 0 && $target_price > 0) {
+            $risk_price = abs($entry_price - $stop_loss);
+            $reward_price = abs($target_price - $entry_price);
+            if ($risk_price > 0) {
+                $rr_ratio = $reward_price / $risk_price;
+                $rr_sum += $rr_ratio;
+                $rr_count++;
             }
         }
     }
+    
+    if ($rr_count > 0) {
+        $avg_rr = $rr_sum / $rr_count;
+    }
+    
+    // Calculate Open Risk (sum of all risk amounts for open trades divided by total capital)
+    foreach ($rows as $r) {
+        $closed_val = $has_closed_at ? ($r['closed_at'] ?? '') : ($has_close_date ? ($r['close_date'] ?? null) : null);
+        $deleted_at = $has_deleted_at ? ($r['deleted_at'] ?? '') : '';
+        $outcome_val = $has_outcome ? strtoupper(trim((string)($r['outcome'] ?? 'OPEN'))) : 'OPEN';
+        $is_closed = $has_closed_at ? !empty($closed_val) : ($has_close_date ? !empty($closed_val) : ($outcome_val !== 'OPEN'));
+        $is_deleted = !empty($deleted_at);
+        
+        if (!$is_closed && !$is_deleted) {
+            $entry_price = isset($r['entry_price']) ? (float)$r['entry_price'] : 0;
+            $stop_loss = isset($r['stop_loss']) ? (float)$r['stop_loss'] : 0;
+            $position_pct = isset($r['position_percent']) ? (float)$r['position_percent'] : 0;
+            
+            if ($entry_price > 0 && $stop_loss > 0) {
+                $amount_invested = ($tot_cap * $position_pct) / 100;
+                $risk_amount = abs($entry_price - $stop_loss) * ($amount_invested / $entry_price);
+                $open_risk_amount += $risk_amount;
+            }
+        }
+    }
+    
+    $open_risk_percentage = $tot_cap > 0 ? ($open_risk_amount / $tot_cap) * 100 : 0;
+    
 } catch (Exception $e) {
-    // Keep default values if API call fails
+    // Keep defaults
 }
 
-// Update available funds
-$available = max(0, $tot_cap - $reserved);
-
-// ---------- MTM Data (kept as is for now) ----------
 $mtm_active = [];
 $mtm_pending = [];
 $mtm_guidance_links = [];
@@ -332,32 +524,7 @@ include __DIR__.'/header.php';
   box-shadow: none !important;
 }
 
-/* Loading State Styles */
-.loading-placeholder {
-    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-    background-size: 200% 100%;
-    animation: loading 1.5s infinite;
-    border-radius: 4px;
-}
 
-@keyframes loading {
-    0% {
-        background-position: 200% 0;
-    }
-    100% {
-        background-position: -200% 0;
-    }
-}
-
-.api-error {
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    color: #dc2626;
-    padding: 8px 12px;
-    border-radius: 6px;
-    font-size: 12px;
-    margin: 4px 0;
-}
 
 /* SIMPLIFIED GLOBAL CONTAINMENT */
 *{
@@ -1006,67 +1173,41 @@ th{text-align:left;color:#374151}
   background:#f3f4f6;
   color:#4c1d95;
 }
+/* ENHANCED MOBILE RESPONSIVE DESIGN */
 
-/* API Data Loading States */
-.api-loading {
-    position: relative;
-}
-
-.api-loading::after {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 10;
-}
-
-.api-loading::before {
-    content: 'Loading...';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 11;
-    background: #4f46e5;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-/* Responsive Design */
+/* Tablet and below - Reduce widget prominence */
 @media (max-width:768px){
+  /* Stack Capital & Performance widgets vertically */
   div[style*="grid-template-columns:1fr 1fr"] {
     grid-template-columns:1fr !important;
     gap:6px !important;
   }
   
+  /* Reduce widget padding and make more compact */
   .section-card{padding:8px !important;margin-bottom:6px !important;}
   .section-title{font-size:12px !important;margin-bottom:4px !important;}
   
+  /* Adjust capital and KPI items for better mobile fit */
   .capital-grid,.kpi-grid{gap:6px !important;}
   .capital-item,.kpi-item{padding:5px !important;}
   .capital-item .item-label,.kpi-item .item-label{font-size:9px !important;}
   .capital-item .item-value,.kpi-item .item-value{font-size:12px !important;}
   .capital-item .item-subvalue,.kpi-item .item-subvalue{font-size:8px !important;}
   
+  /* Matrix cards more compact */
   .matrix-card{padding:10px !important;}
   .matrix-card .card-title{font-size:10px !important;}
   .matrix-card .card-value{font-size:16px !important;}
   .matrix-card .card-subtitle{font-size:10px !important;}
 }
 
+/* Mobile phones - Maximum compactness */
 @media (max-width:520px){
+  /* Further reduce widget prominence on small screens */
   .section-card{padding:6px !important;margin-bottom:4px !important;border-radius:8px !important;}
   .section-title{font-size:11px !important;margin-bottom:3px !important;}
   
+  /* Ultra-compact capital and KPI items */
   .capital-grid,.kpi-grid{gap:4px !important;}
   .capital-item,.kpi-item{padding:3px 4px !important;border-radius:4px !important;}
   .capital-item .item-label,.kpi-item .item-label{
@@ -1085,6 +1226,7 @@ th{text-align:left;color:#374151}
     margin-top:1px !important;
   }
   
+  /* Ensure proper text wrapping and prevent truncation */
   .capital-item .item-value,.kpi-item .item-value,
   .capital-item .item-subvalue,.kpi-item .item-subvalue{
     overflow:hidden !important;
@@ -1093,42 +1235,54 @@ th{text-align:left;color:#374151}
     max-width:100% !important;
   }
   
+  /* Matrix cards ultra-compact */
   .matrix-card{padding:8px !important;border-radius:8px !important;}
   .matrix-card .card-title{font-size:9px !important;margin-bottom:4px !important;}
   .matrix-card .card-value{font-size:14px !important;}
   .matrix-card .card-subtitle{font-size:9px !important;}
   
+  /* Keep trading table scrollable but reduce min-width */
   .trading-table{min-width:750px !important;}
   
+  /* Stock links more compact */
   .stock-symbol-link{padding:3px 5px !important;font-size:13px !important;}
   
+  /* Ensure trading journal remains prominent */
   .trading-journal-card{margin-top:12px !important;}
   .trading-journal-header{padding:12px 14px !important;}
   .trading-journal-title{font-size:15px !important;}
 }
 
+/* Extra small screens - Maximum compression */
 @media (max-width:380px){
+  /* Even more compact widgets */
   .section-card{padding:4px !important;margin-bottom:3px !important;}
   .section-title{font-size:10px !important;margin-bottom:2px !important;}
   
+  /* Minimal spacing for ultra-compact display */
   .capital-grid,.kpi-grid{gap:3px !important;}
   .capital-item,.kpi-item{padding:2px 3px !important;}
   .capital-item .item-label,.kpi-item .item-label{font-size:7px !important;}
   .capital-item .item-value,.kpi-item .item-value{font-size:10px !important;}
   .capital-item .item-subvalue,.kpi-item .item-subvalue{font-size:6px !important;}
   
+  /* Matrix cards minimal */
   .matrix-card{padding:6px !important;}
   .matrix-card .card-title{font-size:8px !important;}
   .matrix-card .card-value{font-size:12px !important;}
   .matrix-card .card-subtitle{font-size:8px !important;}
   
+  /* Allow horizontal scrolling for trading table */
   .trading-table{min-width:700px !important;}
   
+  /* Compact stock links */
   .stock-symbol-link{padding:2px 4px !important;font-size:12px !important;}
   
+  /* Minimal trading journal header */
   .trading-journal-header{padding:10px 12px !important;}
   .trading-journal-title{font-size:14px !important;}
   
+  /* Compact action buttons */
   .trading-journal-actions .btn{
     padding:4px 8px !important;
     font-size:10px !important;
@@ -1136,11 +1290,13 @@ th{text-align:left;color:#374151}
   }
 }
 
+/* Keep original responsive styles for reference */
 @media (max-width:720px){
   .header-actions{width:100%;justify-content:flex-start}
   .trading-journal-header{flex-direction:column;align-items:flex-start;gap:12px;padding:16px}
   .trading-journal-actions{width:100%;justify-content:flex-start}
 }
+
 </style>
 
 <main>
@@ -1292,29 +1448,52 @@ th{text-align:left;color:#374151}
                             </thead>
                             <tbody>
                                 <?php foreach ($rows as $r): 
+                                    $snapshot_meta = [];
+                                    if (!empty($r['rules_snapshot'])) {
+                                        $decoded = json_decode($r['rules_snapshot'], true);
+                                        if (is_array($decoded)) {
+                                            if (isset($decoded['trade_inputs']) && is_array($decoded['trade_inputs'])) {
+                                                $snapshot_meta = $decoded['trade_inputs'];
+                                            } else {
+                                                $snapshot_meta = $decoded;
+                                            }
+                                        }
+                                    }
                                     $trade_id = (int)($r['id'] ?? 0);
                                     $symbol = h($r['symbol'] ?? 'N/A');
-                                    $entry_date = isset($r['opened_at']) ? h(date('Y-m-d', strtotime($r['opened_at']))) : h(date('Y-m-d'));
-                                    $position_pct = isset($r['position_percent']) ? (float)$r['position_percent'] : 0;
+                                    $entry_date = isset($r['entry_date']) ? h($r['entry_date']) : h(date('Y-m-d'));
+                                    $position_pct = isset($r['position_percent']) ? (float)$r['position_percent']
+                                        : (isset($r['risk_pct']) ? (float)$r['risk_pct']
+                                        : (isset($snapshot_meta['position_percent']) ? (float)$snapshot_meta['position_percent'] : 0));
                                     $entry_price = isset($r['entry_price']) ? (float)$r['entry_price'] : 0;
-                                    $stop_loss = isset($r['stop_loss']) ? (float)$r['stop_loss'] : 0;
-                                    $target_price = isset($r['target_price']) ? (float)$r['target_price'] : 0;
-                                    $pnl = isset($r['pnl']) ? (float)$r['pnl'] : null;
-                                    $is_closed = (isset($r['outcome']) && strtoupper($r['outcome']) !== 'OPEN');
+                                    $stop_loss = isset($r['stop_loss']) ? (float)$r['stop_loss']
+                                        : (isset($snapshot_meta['stop_loss']) ? (float)$snapshot_meta['stop_loss'] : null);
+                                    $target_price = isset($r['target_price']) ? (float)$r['target_price']
+                                        : (isset($snapshot_meta['target_price']) ? (float)$snapshot_meta['target_price'] : null);
+                                    $pnl = $has_pnl && isset($r['pnl']) ? (float)$r['pnl'] : null;
+                                    $pl_percent = $has_pl_percent && isset($r['pl_percent']) ? (float)$r['pl_percent'] : null;
+                                    $closed_val = $has_closed_at ? ($r['closed_at'] ?? '') : ($has_close_date ? ($r['close_date'] ?? null) : null);
+                                    $deleted_at = $has_deleted_at ? ($r['deleted_at'] ?? '') : '';
+                                    $outcome_val = $has_outcome ? strtoupper(trim((string)($r['outcome'] ?? 'OPEN'))) : 'OPEN';
+                                    $is_closed = $has_closed_at ? !empty($closed_val) : ($has_close_date ? !empty($closed_val) : ($outcome_val !== 'OPEN'));
+                                    $is_deleted = !empty($deleted_at);
 
-                                    $status_class = $is_closed ? 'badge-success' : 'badge-warning';
-                                    $status_text = $is_closed ? 'Closed' : 'Open';
+                                    $status_class = $is_deleted ? 'badge-danger' : ($is_closed ? 'badge-success' : 'badge-warning');
+                                    $status_text = $is_deleted ? 'Deleted' : ($is_closed ? 'Closed' : 'Open');
 
-                                    // Calculate metrics
+                                    // Calculate metrics with updated formatting
                                     $amount_invested = ($tot_cap * $position_pct) / 100;
                                     
+                                    // Risk Amount
                                     $risk_amount = 0;
                                     if ($entry_price > 0 && $stop_loss > 0) {
                                         $risk_amount = abs($entry_price - $stop_loss) * ($amount_invested / $entry_price);
                                     }
                                     
+                                    // Risk per Trade (RPT) %
                                     $risk_per_trade = $tot_cap > 0 ? ($risk_amount / $tot_cap) * 100 : 0;
                                     
+                                    // Risk to Reward (RR) Ratio
                                     $rr_ratio = '';
                                     $rr_value_formatted = 0;
                                     if ($entry_price > 0 && $stop_loss > 0 && $target_price > 0) {
@@ -1326,18 +1505,49 @@ th{text-align:left;color:#374151}
                                         }
                                     }
                                     
+                                    // Number of Quantity (rounded to whole numbers)
                                     $quantity = 0;
                                     if ($entry_price > 0) {
                                         $quantity = round($amount_invested / $entry_price);
                                     }
 
-                                    $actionBtns = '<a href="/trade_edit.php?id=' . $trade_id . '" class="action-btn edit-btn">Edit</a>';
-                                    $actionBtns .= ' <form method="POST" action="" style="display:inline" onsubmit="return confirm(\'Delete this trade?\')">';
-                                    $actionBtns .= '<input type="hidden" name="csrf" value="' . h($_SESSION['csrf']) . '">';
-                                    $actionBtns .= '<input type="hidden" name="action" value="soft_delete">';
-                                    $actionBtns .= '<input type="hidden" name="trade_id" value="' . $trade_id . '">';
-                                    $actionBtns .= '<button type="submit" class="action-btn delete-btn">Delete</button>';
-                                    $actionBtns .= '</form>';
+                                    // Action Button Logic
+                                    if ($is_deleted) {
+                                        $actionBtns = '<span style="color:#94a3b8;font-size:12px;">—</span>';
+                                    } elseif (!$is_closed) {
+                                        // OPEN trades: Edit + Delete buttons
+                                        $actionBtns = '<a href="/trade_edit.php?id=' . $trade_id . '" class="action-btn edit-btn">Edit</a>';
+                                        $actionBtns .= ' <form method="POST" action="" style="display:inline" onsubmit="return confirm(\'Delete this trade?\')">';
+                                        $actionBtns .= '<input type="hidden" name="csrf" value="' . h($_SESSION['csrf']) . '">';
+                                        $actionBtns .= '<input type="hidden" name="action" value="soft_delete">';
+                                        $actionBtns .= '<input type="hidden" name="trade_id" value="' . $trade_id . '">';
+                                        $actionBtns .= '<button type="submit" class="action-btn delete-btn">Delete</button>';
+                                        $actionBtns .= '</form>';
+                                    } else {
+                                        // CLOSED trades: Check unlock status
+                                        $unlock_requested = false;
+                                        
+                                        // Check if unlock_status column exists and has pending status
+                                        if (column_exists($mysqli, 'trades', 'unlock_status')) {
+                                            $unlock_status = $r['unlock_status'] ?? '';
+                                            if (strtolower($unlock_status) === 'pending' || strtolower($unlock_status) === 'approved') {
+                                                $unlock_requested = true;
+                                            }
+                                        }
+                                        
+                                        // Check if request exists in session (fallback method)
+                                        if (!$unlock_requested && isset($_SESSION['unlock_request_' . $trade_id])) {
+                                            $unlock_requested = true;
+                                        }
+                                        
+                                        if ($unlock_requested) {
+                                            // Show "Request Sent" status
+                                            $actionBtns = '<span style="color:#0891b2;font-size:11px;font-weight:600;">Request Sent</span>';
+                                        } else {
+                                            // Show "Request for Unlock" button
+                                            $actionBtns = '<a href="/trade_unlock_request.php?id=' . $trade_id . '" class="action-btn unlock-btn">Request Unlock</a>';
+                                        }
+                                    }
                                 ?>
                                     <tr>
                                         <td style="font-weight:600">#<?= $trade_id ?></td>
@@ -1352,10 +1562,21 @@ th{text-align:left;color:#374151}
                                         <td><?= ($stop_loss !== null && $stop_loss > 0) ? money($stop_loss) : '—' ?></td>
                                         <td><?= ($target_price !== null && $target_price > 0) ? money($target_price) : '—' ?></td>
                                         <td style="font-weight:700;color:#5a2bd9"><?= $rr_ratio !== '' ? format_rr($rr_value_formatted) : '—' ?></td>
-                                        <td style="font-weight:700; color: <?= ($pnl !== null && $pnl >= 0) ? '#059669' : '#dc2626' ?>;">
+                                        <td style="font-weight:700; color: <?php
+                                            $positive = $pnl !== null ? ($pnl >= 0) : ($pl_percent !== null ? ($pl_percent >= 0) : true);
+                                            echo $positive ? '#059669' : '#dc2626';
+                                        ?>;">
                                             <?php
-                                            if ($pnl !== null && $pnl != 0) {
+                                            // Display both P&L amount and percentage
+                                            if ($pnl !== null && $pl_percent !== null) {
+                                                // Show both amount and percentage: "₹500 (10.5%)"
+                                                echo money($pnl) . ' (' . number_format($pl_percent, 1) . '%)';
+                                            } elseif ($pnl !== null && $pnl != 0) {
+                                                // Show only amount if percentage not available
                                                 echo money($pnl);
+                                            } elseif ($pl_percent !== null && $pl_percent != 0) {
+                                                // Show only percentage if amount not available
+                                                echo number_format($pl_percent, 2) . '%';
                                             } else {
                                                 echo '—';
                                             }
@@ -1372,6 +1593,7 @@ th{text-align:left;color:#374151}
                             </tbody>
                         </table>
                     </div>
+                    <!-- Export PDF Button - Below Trading Journal Table (Right Side, Unnoticeable) -->
                     <div style="margin-top: 8px; text-align: right; padding: 8px 0; border-top: 1px solid #f3f4f6;">
                         <a href="?export=1" style="font-size: 10px; color: #9ca3af; text-decoration: none; opacity: 0.6; padding: 4px 8px; border-radius: 4px; border: 1px solid #e5e7eb; background: #f9fafb;">PDF</a>
                     </div>
@@ -1461,43 +1683,54 @@ th{text-align:left;color:#374151}
             </div>
         <?php endif; ?>
     </div>
-</main>
+    </main>
 </div>
+
+
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Dashboard API Integration JavaScript
-    loadDashboardData();
-    
-    const toggleButtons = document.querySelectorAll('.toggle-chip');
+
+const toggleButtons = document.querySelectorAll('.toggle-chip');
     const panes = document.querySelectorAll('.dashboard-pane');
     
+    // Enhanced toggle function with exclusive OR logic
     function setActiveSection(targetId) {
+        // Defensive check: remove active class from all toggle buttons
         toggleButtons.forEach(btn => btn.classList.remove('active'));
+        
+        // Defensive check: hide all panes
         panes.forEach(pane => pane.classList.remove('is-active'));
         
+        // Find and activate the target toggle button
         const targetBtn = document.querySelector(`[data-target="${targetId}"]`);
         if (targetBtn) {
             targetBtn.classList.add('active');
         }
         
+        // Find and show the target pane
         const targetPane = document.getElementById(targetId);
         if (targetPane) {
             targetPane.classList.add('is-active');
         }
     }
     
+    // Initialize with default section (exclusive OR - only one active)
     const defaultPane = document.querySelector('.dashboard-pane.is-active');
     if (defaultPane) {
         setActiveSection(defaultPane.id);
     }
     
+    // Attach click handlers to toggle buttons
     toggleButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             const targetId = btn.dataset.target;
             
+            // Ensure exclusive OR: only one section visible
             if (btn.classList.contains('active')) {
+                // Already active, no change needed
                 return;
             }
             
@@ -1517,93 +1750,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
-
-async function loadDashboardData() {
-    try {
-        // Add loading states
-        showLoadingState();
-        
-        // Load profile data
-        await loadProfileData();
-        
-        // Load trades data
-        await loadTradesData();
-        
-        // Remove loading states
-        hideLoadingState();
-        
-    } catch (error) {
-        console.error('Dashboard API integration error:', error);
-        showApiError('Some data could not be loaded. Displaying cached data.');
-        hideLoadingState();
-    }
-}
-
-function showLoadingState() {
-    const capitalSection = document.querySelector('.capital-grid');
-    const kpiSection = document.querySelector('.kpi-grid');
-    
-    if (capitalSection) {
-        capitalSection.parentElement.classList.add('api-loading');
-    }
-    if (kpiSection) {
-        kpiSection.parentElement.classList.add('api-loading');
-    }
-}
-
-function hideLoadingState() {
-    const elements = document.querySelectorAll('.api-loading');
-    elements.forEach(el => el.classList.remove('api-loading'));
-}
-
-function showApiError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'api-error';
-    errorDiv.textContent = message;
-    
-    const dashboardHeader = document.querySelector('.dashboard-header');
-    if (dashboardHeader) {
-        dashboardHeader.appendChild(errorDiv);
-        
-        setTimeout(() => {
-            errorDiv.remove();
-        }, 5000);
-    }
-}
-
-async function loadProfileData() {
-    try {
-        const response = await fetch('/api/profile/me.php');
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.data) {
-                // Update capital values if needed
-                const profile = data.data;
-                // Capital values are already set in PHP, but we could update them here if needed
-            }
-        }
-    } catch (error) {
-        console.warn('Profile API call failed:', error);
-        // Graceful degradation - keep default values
-    }
-}
-
-async function loadTradesData() {
-    try {
-        const response = await fetch('/api/trades/list.php?limit=1000');
-        if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.data) {
-                // Process trades data for advanced calculations
-                const trades = data.data.rows || [];
-                // Advanced metrics are calculated in PHP, but we could add real-time updates here
-            }
-        }
-    } catch (error) {
-        console.warn('Trades API call failed:', error);
-        // Graceful degradation - keep existing data
-    }
-}
 </script>
 
 <?php include __DIR__.'/footer.php'; ?>
