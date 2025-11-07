@@ -105,13 +105,11 @@ try {
     
     // Return success response in unified JSON envelope format
     json_success([
-        'data' => [
-            'rows' => $rows,
-            'meta' => [
-                'total' => $total,
-                'limit' => $limit,
-                'offset' => $offset
-            ]
+        'rows' => $rows,
+        'meta' => [
+            'total' => $total,
+            'limit' => $limit,
+            'offset' => $offset
         ]
     ], 'Trades retrieved successfully');
     

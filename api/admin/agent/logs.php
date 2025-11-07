@@ -121,11 +121,25 @@ try {
             'Admin accessed agent logs with filters: ' . json_encode($filters));
     }
     
+    // Never leak PII in details
+    $sanitizedItems = [];
+    foreach ($items as $item) {
+        $sanitizedItem = $item;
+        // Remove or sanitize any PII in meta
+        if (isset($sanitizedItem['meta']) && is_array($sanitizedItem['meta'])) {
+            // Basic PII sanitization - remove common PII fields
+            unset($sanitizedItem['meta']['email'], $sanitizedItem['meta']['phone'], $sanitizedItem['meta']['ssn']);
+        }
+        $sanitizedItems[] = $sanitizedItem;
+    }
+    
     json_success([
-        'items' => $items,
-        'total' => (int)$totalCount,
-        'limit' => $limit,
-        'offset' => $offset
+        'rows' => $sanitizedItems,
+        'meta' => [
+            'total' => (int)$totalCount,
+            'limit' => $limit,
+            'offset' => $offset
+        ]
     ], 'Agent logs retrieved successfully');
     
 } catch (Exception $e) {

@@ -31,21 +31,21 @@ function require_csrf_json(): bool {
         return true;
     }
     
-    // E2E test detection and bypass
-    $isE2E = (
-        getenv('ALLOW_CSRF_BYPASS') === '1' && getenv('APP_ENV') === 'local' ||
-        ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest' ||
-        strpos($_SERVER['HTTP_USER_AGENT'] ?? '', 'E2E') !== false
-    );
+    // E2E test detection and bypass - when (APP_ENV in {local, dev}) AND (ALLOW_CSRF_BYPASS == '1')
+    $appEnv = getenv('APP_ENV') ?? '';
+    $allowBypass = getenv('ALLOW_CSRF_BYPASS') === '1';
+    $isE2E = in_array($appEnv, ['local', 'dev'], true) && $allowBypass;
     
     if ($isE2E) {
-        // Allow E2E tests to bypass CSRF validation with audit logging
+        // Log bypass via audit logger: event=CSRF_BYPASS_E2E, user or anon
+        $userId = $_SESSION['user_id'] ?? 'anon';
         if (function_exists('app_log')) {
-            app_log('security', 'csrf_bypass_e2e', [
-                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
-                'request_uri' => $_SERVER['REQUEST_URI'] ?? '',
-                'bypass_reason' => 'e2e_mode'
-            ]);
+            app_log('info', sprintf(
+                'CSRF_BYPASS_E2E - User=%s, URI=%s, User-Agent=%s',
+                $userId,
+                $_SERVER['REQUEST_URI'] ?? '',
+                $_SERVER['HTTP_USER_AGENT'] ?? ''
+            ));
         }
         return true;
     }

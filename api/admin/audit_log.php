@@ -49,6 +49,35 @@ try {
         $paramTypes[] = 'i';
     }
     
+    // Search query filter (q)
+    if (isset($_GET['q']) && trim($_GET['q']) !== '') {
+        $query = trim($_GET['q']);
+        $filters['q'] = $query;
+        $whereConditions[] = '(description LIKE ? OR event_type LIKE ?)';
+        $params[] = '%' . $query . '%';
+        $params[] = '%' . $query . '%';
+        $paramTypes[] = 's';
+        $paramTypes[] = 's';
+    }
+    
+    // Since filter (start date)
+    if (isset($_GET['since']) && trim($_GET['since']) !== '') {
+        $since = trim($_GET['since']);
+        $filters['since'] = $since;
+        $whereConditions[] = 'created_at >= ?';
+        $params[] = $since;
+        $paramTypes[] = 's';
+    }
+    
+    // Until filter (end date)
+    if (isset($_GET['until']) && trim($_GET['until']) !== '') {
+        $until = trim($_GET['until']);
+        $filters['until'] = $until;
+        $whereConditions[] = 'created_at <= ?';
+        $params[] = $until;
+        $paramTypes[] = 's';
+    }
+    
     // Pagination
     $limit = isset($_GET['limit']) && is_numeric($_GET['limit'])
         ? min(100, max(1, (int)$_GET['limit'])) : 20;

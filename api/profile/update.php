@@ -161,7 +161,7 @@ if (empty($input)) {
         json_error('VALIDATION_ERROR', 'No changes made to profile');
     }
     
-    // Get updated profile snapshot
+    // Get updated profile snapshot - match exact me.php structure
     $profileStmt = $mysqli->prepare("
         SELECT
             id, name, email, role, status, email_verified, phone, timezone, created_at, updated_at
@@ -174,8 +174,21 @@ if (empty($input)) {
         $profileStmt->bind_param('i', $userId);
         $profileStmt->execute();
         $profileResult = $profileStmt->get_result();
-        $updatedProfile = $profileResult->fetch_assoc();
+        $rawProfile = $profileResult->fetch_assoc();
         $profileStmt->close();
+        
+        // Format exactly like me.php response
+        if ($rawProfile) {
+            $updatedProfile = [
+                'id' => (int)$rawProfile['id'],
+                'name' => $rawProfile['name'],
+                'email' => $rawProfile['email'],
+                'phone' => $rawProfile['phone'] ?? '',
+                'timezone' => $rawProfile['timezone'] ?? '',
+                'trading_capital' => 0.0,
+                'funds_available' => 0.0
+            ];
+        }
     }
     
     // Log profile update
@@ -185,11 +198,8 @@ if (empty($input)) {
         implode(', ', array_keys($input))
     ));
     
-    // Return success response in unified JSON envelope format
-    json_success([
-        'profile' => $updatedProfile,
-        'updated_fields' => array_keys($input)
-    ], 'Profile updated successfully');
+    // Return success response matching me.php structure exactly
+    json_success($updatedProfile, '', null);
     
 } catch (Exception $e) {
     // Log error

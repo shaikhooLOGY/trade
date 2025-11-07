@@ -1222,155 +1222,53 @@ servers:
         - Trades
       summary: List User Trades
       description: |
-        Get trade history for the authenticated trader with optional filtering.
+        Get trade history for the authenticated trader with optional filtering and pagination.
         
         **Compliance**: Logs trade list access for audit trail.
+        **Filters**: ?status=open|closed, ?limit, ?offset
         
       operationId: listTrades
       parameters:
-        - name: symbol
+        - name: status
           in: query
-          description: Filter by trading symbol
+          description: Filter by trade status
           schema:
             type: string
-        - name: from
-          in: query
-          description: Filter trades from date (YYYY-MM-DD)
-          schema:
-            type: string
-            format: date
-        - name: to
-          in: query
-          description: Filter trades to date (YYYY-MM-DD)
-          schema:
-            type: string
-            format: date
-        - name: page
-          in: query
-          description: Page number for pagination
-          schema:
-            type: integer
-            minimum: 1
-            default: 1
+            enum: [open, closed]
         - name: limit
           in: query
-          description: Number of results per page
+          description: Number of results per page (max 100)
           schema:
             type: integer
             minimum: 1
             maximum: 100
             default: 20
+        - name: offset
+          in: query
+          description: Offset for pagination
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Trades retrieved successfully
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Trade'
-                  message:
-                    type: string
-                    example: "Trades retrieved successfully"
-                  error:
-                    type: "null"
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                  error:
-                    type: string
+                $ref: '#/components/schemas/ApiResponse'
         '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                  error:
-                    type: string
+                $ref: '#/components/schemas/ApiResponse'
         '429':
           description: Rate limit exceeded
-          headers:
-            X-RateLimit-Limit:
-              description: Total requests allowed per minute
-              schema:
-                type: integer
-                example: 5
-            X-RateLimit-Remaining:
-              description: Requests remaining in current window
-              schema:
-                type: integer
-                example: 0
-            X-RateLimit-Reset:
-              description: Unix timestamp when rate limit resets
-              schema:
-                type: integer
-                example: 1730889600
-            Retry-After:
-              description: Seconds to wait before retrying
-              schema:
-                type: integer
-                example: 60
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                    example: "Rate limit exceeded. Try again later."
-                  error:
-                    type: string
-                    example: "RATE_LIMITED"
+                $ref: '#/components/schemas/ApiResponse'
 
   /api/trades/update:
     post:
@@ -2442,16 +2340,17 @@ servers:
                   error:
                     type: string
 
-  /api/profile/update:
+  /api/profile/update.php:
     post:
       tags:
         - Profile
       summary: Update User Profile
       description: |
-        Updates the current user's profile information.
+        Updates the current user's profile information with whitelisted fields only.
         
         **Compliance**: Logs all profile updates for audit trail.
-        **Security**: Requires password re-authentication for password changes.
+        **Security**: CSRF protection enforced (403 on CSRF failure)
+        **Response**: Returns exact same structure as profile/me endpoint
         
       operationId: updateProfile
       requestBody:
@@ -2463,128 +2362,46 @@ servers:
               properties:
                 name:
                   type: string
-                  description: User's full name
+                  description: User's full name (2-100 characters)
                   minLength: 2
                   maxLength: 100
-                display_name:
+                phone:
                   type: string
-                  description: Display name
-                  maxLength: 100
-                bio:
-                  type: string
-                  description: User bio
-                  maxLength: 500
-                location:
-                  type: string
-                  description: User location
-                  maxLength: 100
+                  description: Phone number
                 timezone:
                   type: string
                   description: User timezone
-                password:
-                  type: string
-                  description: New password (requires re-authentication)
-                  minLength: 8
-                preferences:
-                  type: object
-                  description: User preferences
-                  additionalProperties: true
       responses:
         '200':
           description: Profile updated successfully
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: true
-                  data:
-                    type: object
-                    properties:
-                      profile:
-                        $ref: '#/components/schemas/UserProfile'
-                      updated_fields:
-                        type: array
-                        items:
-                          type: string
-                      session_security_note:
-                        type: string
-                        description: Security note if session was regenerated
-                  message:
-                    type: string
-                    example: "Profile updated successfully"
-                  error:
-                    type: "null"
+                $ref: '#/components/schemas/UserProfile'
         '400':
           description: Validation error
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                  error:
-                    type: string
+                $ref: '#/components/schemas/ApiResponse'
         '401':
           description: Authentication required
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                  error:
-                    type: string
+                $ref: '#/components/schemas/ApiResponse'
         '403':
-          description: Re-authentication required for password changes
+          description: CSRF token missing or invalid
           content:
             application/json:
               schema:
-                type: object
-                required:
-                  - success
-                  - data
-                  - message
-                  - error
-                properties:
-                  success:
-                    type: boolean
-                    example: false
-                  data:
-                    type: "null"
-                  message:
-                    type: string
-                  error:
-                    type: string
+                $ref: '#/components/schemas/ApiResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
 
   # === Agent Log APIs ===
   /api/agent/log:

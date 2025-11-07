@@ -7,6 +7,7 @@
  */
 
 require_once __DIR__ . '/_bootstrap.php';
+require_once __DIR__ . '/../../includes/security/csrf_guard.php';
 require_once __DIR__ . '/../../includes/security/ratelimit.php';
 require_once __DIR__ . '/../../includes/logger/audit_log.php';
 
@@ -28,23 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 try {
     // Require admin authentication with proper 401/403 handling
-    $adminUser = require_admin_json('Admin access required');
-    if (!$adminUser) {
-        // This shouldn't happen as require_admin_json should exit, but just in case
-        json_error('UNAUTHORIZED', 'Admin authentication required', null, 401);
-    }
-    $adminId = (int)$adminUser['id'];
+    require_admin_json('Admin access required');
+    $adminId = (int)$_SESSION['user_id'];
     
-    // Check CSRF for mutating operations - E2E test bypass
-    $isE2E = (
-        getenv('ALLOW_CSRF_BYPASS') === '1' ||
-        ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest' ||
-        strpos($_SERVER['HTTP_USER_AGENT'] ?? '', 'E2E') !== false
-    );
-    
-    if (!$isE2E) {
-        csrf_api_middleware();
-    }
+    // CSRF protection for mutating requests - E2E test bypass
+    require_csrf_json();
     
     // Rate limiting: 10 per minute
     require_rate_limit('api:admin:approve', 10);

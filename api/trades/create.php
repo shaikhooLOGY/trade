@@ -68,12 +68,38 @@ try {
         }
     }
     
-    // Validate and sanitize input
-    $validation = validate_enhanced_trade_input($input);
-    if (!$validation['valid']) {
-        json_validation_error($validation['errors'], 'Trade validation failed');
+    // Strictly validate numeric fields and coerce to float
+    $required = ['symbol', 'quantity', 'entry_price'];
+    foreach ($required as $field) {
+        if (!isset($input[$field]) || $input[$field] === '') {
+            json_error('VALIDATION_ERROR', "Field '$field' is required");
+        }
     }
-    $tradeData = $validation['data'];
+    
+    // Coerce and validate numeric fields strictly
+    $tradeData = [
+        'symbol' => trim($input['symbol']),
+        'quantity' => (float)$input['quantity'],
+        'entry_price' => (float)$input['entry_price'],
+        'exit_price' => isset($input['exit_price']) ? (float)$input['exit_price'] : null,
+        'stop_loss' => isset($input['stop_loss']) ? (float)$input['stop_loss'] : null,
+        'target_price' => isset($input['target_price']) ? (float)$input['target_price'] : null,
+        'allocation_amount' => isset($input['allocation_amount']) ? (float)$input['allocation_amount'] : null,
+        'notes' => isset($input['notes']) ? trim($input['notes']) : null
+    ];
+    
+    // Validate data types
+    if (!is_string($tradeData['symbol']) || strlen($tradeData['symbol']) < 1 || strlen($tradeData['symbol']) > 20) {
+        json_error('VALIDATION_ERROR', 'Symbol must be 1-20 characters');
+    }
+    
+    if ($tradeData['quantity'] <= 0 || $tradeData['quantity'] > 1000000) {
+        json_error('VALIDATION_ERROR', 'Quantity must be between 0 and 1,000,000');
+    }
+    
+    if ($tradeData['entry_price'] <= 0 || $tradeData['entry_price'] > 1000000) {
+        json_error('VALIDATION_ERROR', 'Entry price must be between 0 and 1,000,000');
+    }
     
     // Start transaction for trade creation and funds deduction
     $mysqli->begin_transaction();
@@ -96,9 +122,12 @@ try {
             json_error('NOT_FOUND', 'User not found');
         }
         
-        // Calculate position percentage
-        $positionPercent = null;
-        if (isset($tradeData['allocation_amount']) && isset($user['trading_capital']) && $user['trading_capital'] > 0) {
+        // outcome default "open"
+        $outcome = 'open';
+        
+        // position_percent: if trading_capital>0 and allocation_amount>0 compute ROUND( (allocation_amount/trading_capital)*100, 2 )
+        $positionPercent = 0.0;
+        if (isset($tradeData['allocation_amount']) && $tradeData['allocation_amount'] > 0 && $user['trading_capital'] > 0) {
             $positionPercent = round(($tradeData['allocation_amount'] / $user['trading_capital']) * 100, 2);
         }
         
@@ -111,12 +140,11 @@ try {
         }
         
         // Calculate PnL if exit_price is provided
-        $pnl = 0;
-        $outcome = 'open'; // default outcome
-        if (isset($tradeData['exit_price']) && isset($tradeData['entry_price']) && isset($tradeData['quantity'])) {
+        $pnl = 0.0;
+        if (isset($tradeData['exit_price']) && $tradeData['exit_price'] > 0) {
             $pnl = ($tradeData['exit_price'] - $tradeData['entry_price']) * $tradeData['quantity'];
             
-            // Determine outcome
+            // Determine outcome only if we have an exit price
             if ($pnl > 0) {
                 $outcome = 'win';
             } elseif ($pnl < 0) {
