@@ -22,48 +22,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    json_fail('METHOD_NOT_ALLOWED', 'Only POST method is allowed');
+json_error('METHOD_NOT_ALLOWED', 'Only POST method is allowed');
 }
 
 try {
-    // Require authentication
-    require_login_json();
-    $userId = (int)($_SESSION['user_id'] ?? 0);
-    
-    // Check CSRF for mutating operations - E2E test bypass
-    $isE2E = (
-        getenv('ALLOW_CSRF_BYPASS') === '1' ||
-        ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest' ||
-        strpos($_SERVER['HTTP_USER_AGENT'] ?? '', 'E2E') !== false
-    );
-    
-    if (!$isE2E) {
-        csrf_api_middleware();
-    }
-    
-    // Get JSON input
-    $input = get_json_input();
-    
-    // Validate that we have data to update
-    if (empty($input)) {
-        json_fail('VALIDATION_ERROR', 'No data provided for update');
-    }
-    
-    // Check if password update requires re-authentication
-    $isPasswordUpdate = isset($input['password']) && !empty($input['password']);
-    if ($isPasswordUpdate) {
-        // For password updates, require recent authentication (within 15 minutes)
-        if (empty($_SESSION['last_auth_check']) ||
-            (time() - $_SESSION['last_auth_check']) > 900) {
-            json_forbidden('Password update requires recent authentication');
-        }
-    }
+// Require authentication
+require_login_json();
+$userId = (int)($_SESSION['user_id'] ?? 0);
+
+// Check CSRF for mutating operations - E2E test bypass
+$isE2E = (
+    getenv('ALLOW_CSRF_BYPASS') === '1' ||
+    ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest' ||
+    strpos($_SERVER['HTTP_USER_AGENT'] ?? '', 'E2E') !== false
+);
+
+if (!$isE2E) {
+    csrf_api_middleware();
+}
+
+// Get JSON input
+$input = get_json_input();
+
+// Validate that we have data to update
+if (empty($input)) {
+    json_error('VALIDATION_ERROR', 'No data provided for update');
+}
     
     global $mysqli;
     
-    // Validate input fields - only fields that exist in users table
+    // Validate input fields - only whitelisted fields (name, phone, timezone)
     $allowedFields = [
-        'name', 'email', 'role', 'status'
+        'name', 'phone', 'timezone'
     ];
     
     $validationErrors = [];
@@ -71,7 +61,14 @@ try {
     $updateValues = [];
     $updateTypes = '';
     
-    // Validate name (exists in users table)
+    // Check if any unknown fields are provided
+    foreach ($input as $field => $value) {
+        if (!in_array($field, $allowedFields, true)) {
+            $validationErrors[$field] = 'Field not allowed for update';
+        }
+    }
+    
+    // Validate name (whitelisted field)
     if (isset($input['name'])) {
         $name = trim($input['name']);
         if (strlen($name) < 2) {
@@ -87,84 +84,29 @@ try {
         }
     }
     
-    // Validate email (exists in users table)
-    if (isset($input['email'])) {
-        $email = trim($input['email']);
-        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $validationErrors['email'] = 'Invalid email format';
+    // Validate phone (whitelisted field)
+    if (isset($input['phone'])) {
+        $phone = trim($input['phone']);
+        if ($phone !== '' && !preg_match('/^\+?[1-9]\d{1,14}$/', str_replace([' ', '-', '(', ')'], '', $phone))) {
+            $validationErrors['phone'] = 'Invalid phone number format';
         } else {
-            $updateFields[] = 'email = ?';
-            $updateValues[] = $email;
+            $updateFields[] = 'phone = ?';
+            $updateValues[] = $phone;
             $updateTypes .= 's';
         }
     }
     
-    // Validate role (exists in users table)
-    if (isset($input['role'])) {
-        $role = trim($input['role']);
-        $validRoles = ['user', 'admin', 'moderator'];
-        if (!in_array($role, $validRoles, true)) {
-            $validationErrors['role'] = 'Invalid role specified';
-        } else {
-            $updateFields[] = 'role = ?';
-            $updateValues[] = $role;
+    // Validate timezone (whitelisted field)
+    if (isset($input['timezone'])) {
+        $timezone = trim($input['timezone']);
+        // Basic timezone validation
+        try {
+            new DateTimeZone($timezone);
+            $updateFields[] = 'timezone = ?';
+            $updateValues[] = $timezone;
             $updateTypes .= 's';
-        }
-    }
-    
-    // Validate status (exists in users table)
-    if (isset($input['status'])) {
-        $status = trim($input['status']);
-        $validStatuses = ['active', 'inactive', 'pending', 'suspended'];
-        if (!in_array($status, $validStatuses, true)) {
-            $validationErrors['status'] = 'Invalid status specified';
-        } else {
-            $updateFields[] = 'status = ?';
-            $updateValues[] = $status;
-            $updateTypes .= 's';
-        }
-    }
-    
-    // Validate and handle password update
-    if (isset($input['password'])) {
-        $password = $input['password'];
-        if (strlen($password) < 8) {
-            $validationErrors['password'] = 'Password must be at least 8 characters long';
-        } elseif (!preg_match('/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/', $password)) {
-            $validationErrors['password'] = 'Password must contain at least one lowercase letter, one uppercase letter, and one number';
-        } else {
-            // Hash the new password
-            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-            $updateFields[] = 'password = ?';
-            $updateValues[] = $hashedPassword;
-            $updateFields[] = 'last_password_change = NOW()';
-            $updateTypes .= 's';
-            
-            // Also need to update session security - session will need regeneration after successful update
-            $needSessionRegeneration = true;
-        }
-    }
-    
-    // Handle preferences update
-    if (isset($input['preferences'])) {
-        if (!is_array($input['preferences'])) {
-            $validationErrors['preferences'] = 'Preferences must be a valid JSON object';
-        } else {
-            // Validate and filter preferences
-            $allowedPreferences = ['theme', 'notifications', 'privacy', 'display'];
-            $filteredPreferences = [];
-            
-            foreach ($input['preferences'] as $key => $value) {
-                if (in_array($key, $allowedPreferences, true)) {
-                    $filteredPreferences[$key] = $value;
-                }
-            }
-            
-            if (!empty($filteredPreferences)) {
-                $updateFields[] = 'preferences = ?';
-                $updateValues[] = json_encode($filteredPreferences);
-                $updateTypes .= 's';
-            }
+        } catch (Exception $e) {
+            $validationErrors['timezone'] = 'Invalid timezone specified';
         }
     }
     
@@ -175,7 +117,7 @@ try {
     
     // If no fields to update, return
     if (empty($updateFields)) {
-        json_fail('VALIDATION_ERROR', 'No valid fields provided for update');
+        json_error('VALIDATION_ERROR', 'No valid fields provided for update');
     }
     
     // Add updated_at timestamp
@@ -197,7 +139,7 @@ try {
     $stmt->close();
     
     if (!$success) {
-        json_fail('SERVER_ERROR', 'Failed to update profile');
+        json_error('SERVER_ERROR', 'Failed to update profile');
     }
     
     if ($affectedRows === 0) {
@@ -211,69 +153,46 @@ try {
             $checkStmt->close();
             
             if (!$userExists) {
-                json_not_found('User profile');
+                json_error('NOT_FOUND', 'User profile');
             }
         }
         
         // If user exists but no rows affected, it means the update didn't change anything
-        json_fail('VALIDATION_ERROR', 'No changes made to profile');
+        json_error('VALIDATION_ERROR', 'No changes made to profile');
     }
     
-    // Regenerate session ID if password was updated (security best practice)
-    if (isset($needSessionRegeneration) && $needSessionRegeneration) {
-        session_regenerate_id(true);
-        // Update last auth check time
-        $_SESSION['last_auth_check'] = time();
-    }
-    
-    // Get updated profile to return
-    $stmt = $mysqli->prepare("
+    // Get updated profile snapshot
+    $profileStmt = $mysqli->prepare("
         SELECT
-            id, name, email, role, status, email_verified
+            id, name, email, role, status, email_verified, phone, timezone, created_at, updated_at
         FROM users
         WHERE id = ?
     ");
     
-    if ($stmt) {
-        $stmt->bind_param('i', $userId);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $updatedProfile = $result->fetch_assoc();
-        $stmt->close();
-        
-        // Parse preferences if available
-        if (!empty($updatedProfile['preferences'])) {
-            $decodedPreferences = json_decode($updatedProfile['preferences'], true);
-            if (json_last_error() === JSON_ERROR_NONE) {
-                $updatedProfile['preferences'] = $decodedPreferences;
-            }
-        }
+    $updatedProfile = [];
+    if ($profileStmt) {
+        $profileStmt->bind_param('i', $userId);
+        $profileStmt->execute();
+        $profileResult = $profileStmt->get_result();
+        $updatedProfile = $profileResult->fetch_assoc();
+        $profileStmt->close();
     }
     
-    // Log profile update using authoritative audit function
-    audit_profile_update(
+    // Log profile update
+    app_log('info', sprintf(
+        'User profile updated: ID=%d, Fields=%s',
         $userId,
-        'update',
-        $userId,
-        sprintf('User profile updated - Fields: %s', implode(', ', array_keys($input)))
-    );
+        implode(', ', array_keys($input))
+    ));
     
-    // Return success response
-    json_ok([
-        'profile' => $updatedProfile ?? [],
-        'updated_fields' => array_keys($input),
-        'session_security_note' => ($isPasswordUpdate ?? false) ? 'Session regenerated for security' : null
+    // Return success response in unified JSON envelope format
+    json_success([
+        'profile' => $updatedProfile,
+        'updated_fields' => array_keys($input)
     ], 'Profile updated successfully');
     
 } catch (Exception $e) {
-    // Log error using authoritative audit function
-    audit_profile_update(
-        $userId ?? null,
-        'system_error',
-        $userId ?? null,
-        'Profile update error: ' . $e->getMessage()
-    );
-    
+    // Log error
     app_log('error', 'Profile update error: ' . $e->getMessage());
-    json_fail('SERVER_ERROR', 'Failed to update profile');
+    json_error('SERVER_ERROR', 'Failed to update profile');
 }

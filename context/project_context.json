@@ -396,15 +396,15 @@
         "artifacts_url": null
     },
     "last_full_e2e": {
-        "timestamp": "2025-11-07_16-34-31",
+        "timestamp": "2025-11-07_17-02-59",
         "result": 48.38709677419355,
-        "test_user": "e2e_user_2025-11-07_16-34-31@local.test",
-        "admin_user": "e2e_test_admin@local.test",
+        "test_user": "e2e_user_2025-11-07_17-02-59@local.test",
+        "admin_user": "admin@local.test",
         "cleanup": false,
         "e2e_mode": true,
         "csrf_bypass": true,
         "pass_rate": 48.38709677419355,
-        "artifacts_path": "2025-11-07_16-34-31"
+        "artifacts_path": "2025-11-07_17-02-59"
     },
     "last_quick_litmus": {
         "timestamp": "2025-11-07T10:42:26.000Z",

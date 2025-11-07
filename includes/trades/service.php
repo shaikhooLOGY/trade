@@ -360,7 +360,7 @@ function validate_trade_input_service(array $input): array {
 
 /**
  * Calculate trade metrics for dashboard
- * 
+ *
  * @param int $traderId User ID
  * @param string|null $fromDate Optional date range start
  * @param string|null $toDate Optional date range end
@@ -417,8 +417,8 @@ function calculate_trade_metrics_service(int $traderId, ?string $fromDate = null
         // Get total P&L (simplified calculation)
         $pnlWhere = $whereClause . " AND quantity IS NOT NULL AND price IS NOT NULL";
         $stmt = $mysqli->prepare("
-            SELECT 
-                SUM(CASE 
+            SELECT
+                SUM(CASE
                     WHEN side = 'buy' THEN quantity * (COALESCE(close_price, price) - price)
                     ELSE quantity * (price - COALESCE(close_price, price))
                 END) as total_pnl
@@ -446,4 +446,106 @@ function calculate_trade_metrics_service(int $traderId, ?string $fromDate = null
             'total_pnl' => 0
         ];
     }
+}
+
+/**
+ * Enhanced trade input validation for E2E requirements
+ *
+ * @param array $input Raw input data
+ * @return array Validation result with 'valid' boolean and 'errors' or 'data'
+ */
+function validate_enhanced_trade_input(array $input): array {
+    $errors = [];
+    $data = [];
+    
+    // Required fields validation
+    if (!isset($input['symbol']) || empty(trim($input['symbol']))) {
+        $errors['symbol'] = 'Symbol is required';
+    } else {
+        $symbol = strtoupper(trim($input['symbol']));
+        if (!preg_match('/^[A-Z0-9._-]+$/', $symbol)) {
+            $errors['symbol'] = 'Symbol must contain only uppercase letters, numbers, dots, underscores, and hyphens';
+        } elseif (strlen($symbol) > 32) {
+            $errors['symbol'] = 'Symbol must be 32 characters or less';
+        } else {
+            $data['symbol'] = $symbol;
+        }
+    }
+    
+    if (!isset($input['quantity']) || $input['quantity'] === '') {
+        $errors['quantity'] = 'Quantity is required';
+    } else {
+        $quantity = (float)$input['quantity'];
+        if ($quantity <= 0) {
+            $errors['quantity'] = 'Quantity must be greater than 0';
+        } else {
+            $data['quantity'] = $quantity;
+        }
+    }
+    
+    if (!isset($input['entry_price']) || $input['entry_price'] === '') {
+        $errors['entry_price'] = 'Entry price is required';
+    } else {
+        $entryPrice = (float)$input['entry_price'];
+        if ($entryPrice <= 0) {
+            $errors['entry_price'] = 'Entry price must be greater than 0';
+        } else {
+            $data['entry_price'] = $entryPrice;
+        }
+    }
+    
+    // Optional fields validation
+    if (isset($input['exit_price']) && $input['exit_price'] !== '') {
+        $exitPrice = (float)$input['exit_price'];
+        if ($exitPrice <= 0) {
+            $errors['exit_price'] = 'Exit price must be greater than 0';
+        } else {
+            $data['exit_price'] = $exitPrice;
+        }
+    }
+    
+    if (isset($input['stop_loss']) && $input['stop_loss'] !== '') {
+        $stopLoss = (float)$input['stop_loss'];
+        if ($stopLoss < 0) {
+            $errors['stop_loss'] = 'Stop loss cannot be negative';
+        } else {
+            $data['stop_loss'] = $stopLoss;
+        }
+    }
+    
+    if (isset($input['target_price']) && $input['target_price'] !== '') {
+        $targetPrice = (float)$input['target_price'];
+        if ($targetPrice < 0) {
+            $errors['target_price'] = 'Target price cannot be negative';
+        } else {
+            $data['target_price'] = $targetPrice;
+        }
+    }
+    
+    if (isset($input['allocation_amount']) && $input['allocation_amount'] !== '') {
+        $allocationAmount = (float)$input['allocation_amount'];
+        if ($allocationAmount < 0) {
+            $errors['allocation_amount'] = 'Allocation amount cannot be negative';
+        } elseif (!is_numeric($input['allocation_amount'])) {
+            $errors['allocation_amount'] = 'Allocation amount must be numeric';
+        } else {
+            $data['allocation_amount'] = $allocationAmount;
+        }
+    }
+    
+    // Validate notes
+    if (isset($input['notes']) && $input['notes'] !== '') {
+        $notes = trim($input['notes']);
+        if (strlen($notes) > 1000) {
+            $errors['notes'] = 'Notes must be 1000 characters or less';
+        } else {
+            $data['notes'] = htmlspecialchars($notes, ENT_QUOTES, 'UTF-8');
+        }
+    }
+    
+    return [
+        'valid' => empty($errors),
+        'errors' => $errors,
+        'data' => $data
+    ];
 }

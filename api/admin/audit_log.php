@@ -1,9 +1,9 @@
 <?php
 /**
  * api/admin/audit_log.php
- * 
- * Simple Admin API - Basic Audit Log
- * GET /api/admin/audit_log.php?limit=10
+ *
+ * Enhanced Admin API - Audit Log with pagination and filtering
+ * GET /api/admin/audit_log.php?event_type=...&user_id=...&limit=...&offset=...
  */
 
 require_once __DIR__ . '/../_bootstrap.php';
@@ -25,31 +25,70 @@ require_admin_json('Admin access required');
 try {
     global $mysqli;
     
-    // Simple query to get recent audit events
-    $limit = isset($_GET['limit']) ? min(100, max(1, (int)$_GET['limit'])) : 10;
+    // Parse query parameters for filtering
+    $filters = [];
+    $params = [];
+    $paramTypes = [];
+    $whereConditions = ['1=1']; // Always true base condition
     
-    // Check if audit_events table exists
-    $checkTable = $mysqli->query("SHOW TABLES LIKE 'audit_events'");
-    if ($checkTable->num_rows == 0) {
-        // Table doesn't exist, return empty array
-        json_ok([], 'Audit log retrieved (no events table)', [
-            'count' => 0,
-            'table_exists' => false
-        ]);
-        exit;
+    // Event type filter
+    if (isset($_GET['event_type']) && trim($_GET['event_type']) !== '') {
+        $eventType = trim($_GET['event_type']);
+        $filters['event_type'] = $eventType;
+        $whereConditions[] = 'event_type LIKE ?';
+        $params[] = '%' . $eventType . '%';
+        $paramTypes[] = 's';
     }
     
-    $stmt = $mysqli->prepare("
-        SELECT * FROM audit_events 
-        ORDER BY created_at DESC 
-        LIMIT ?
-    ");
+    // User ID filter
+    if (isset($_GET['user_id']) && trim($_GET['user_id']) !== '') {
+        $userIdFilter = (int)$_GET['user_id'];
+        $filters['user_id'] = $userIdFilter;
+        $whereConditions[] = 'user_id = ?';
+        $params[] = $userIdFilter;
+        $paramTypes[] = 'i';
+    }
     
+    // Pagination
+    $limit = isset($_GET['limit']) && is_numeric($_GET['limit'])
+        ? min(100, max(1, (int)$_GET['limit'])) : 20;
+    $params[] = $limit;
+    $paramTypes[] = 'i';
+    
+    // Offset for pagination
+    $offset = isset($_GET['offset']) && is_numeric($_GET['offset'])
+        ? max(0, (int)$_GET['offset']) : 0;
+    $params[] = $offset;
+    $paramTypes[] = 'i';
+    
+    $whereClause = implode(' AND ', $whereConditions);
+    
+    // Get total count for pagination info
+    $countSql = "SELECT COUNT(*) as total FROM audit_events WHERE $whereClause";
+    $countStmt = $mysqli->prepare($countSql);
+    if (!$countStmt) {
+        throw new Exception('Failed to prepare audit log count query');
+    }
+    
+    if (!empty($params) && count($params) > 2) { // Remove limit and offset for count
+        $countParams = array_slice($params, 0, -2);
+        $countParamTypes = array_slice($paramTypes, 0, -2);
+        $countStmt->bind_param(implode('', $countParamTypes), ...$countParams);
+    }
+    $countStmt->execute();
+    $countResult = $countStmt->get_result();
+    $totalCount = $countResult->fetch_assoc()['total'];
+    $countStmt->close();
+    
+    // Get audit events with filtering and pagination
+    $sql = "SELECT * FROM audit_events WHERE $whereClause ORDER BY created_at DESC LIMIT ? OFFSET ?";
+    
+    $stmt = $mysqli->prepare($sql);
     if (!$stmt) {
-        throw new Exception('Failed to prepare audit query');
+        throw new Exception('Failed to prepare audit log query');
     }
     
-    $stmt->bind_param('i', $limit);
+    $stmt->bind_param(implode('', $paramTypes), ...$params);
     $stmt->execute();
     $result = $stmt->get_result();
     
@@ -70,12 +109,28 @@ try {
     }
     $stmt->close();
     
-    // Return success response
-    json_ok($events, 'Audit log retrieved successfully', [
-        'count' => count($events),
-        'table_exists' => true
-    ]);
+    // Log admin access to audit log
+    $adminId = (int)$_SESSION['user_id'];
+    app_log('info', sprintf(
+        'Admin accessed audit log: ID=%d, Filters=%s, Count=%d',
+        $adminId,
+        json_encode($filters),
+        count($events)
+    ));
+    
+    // Return success response in unified JSON envelope format
+    json_success([
+        'data' => [
+            'rows' => $events,
+            'meta' => [
+                'total' => (int)$totalCount,
+                'limit' => $limit,
+                'offset' => $offset,
+                'count' => count($events)
+            ]
+        ]
+    ], 'Audit log retrieved successfully');
     
 } catch (Exception $e) {
-    json_error('Failed to retrieve audit log: ' . $e->getMessage(), 500);
+    json_error('SERVER_ERROR', 'Failed to retrieve audit log: ' . $e->getMessage());
 }
