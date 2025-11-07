@@ -54,12 +54,3 @@ function require_csrf_json(): bool {
     
     return true;
 }
-
-/**
- * Legacy compatibility function for existing API endpoints
- * 
- * @deprecated Use require_csrf_json() instead
- */
-function csrf_api_middleware(): bool {
-    return require_csrf_json();
-}

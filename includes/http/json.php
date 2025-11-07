@@ -208,13 +208,16 @@ function json_error(string $error, string $message = '', ?array $meta = null, in
 /**
  * Legacy compatibility function
  */
-function json_fail(string $code, string $message = '', array $details = [], $data = null): void {
+function json_fail(string $code, string $message = '', array $details = [], $data = null, ?int $statusCode = null): void {
     $response_meta = !empty($details) ? $details : null;
     if ($data !== null) {
         $response_meta = $response_meta ?? [];
         $response_meta['partial_data'] = $data;
     }
-    json_error($code, $message, $response_meta, ERROR_CODES[$code]['http_status'] ?? 400);
+    
+    // Use provided status code or default from error codes
+    $status = $statusCode ?? (ERROR_CODES[$code]['http_status'] ?? 400);
+    json_error($code, $message, $response_meta, $status);
 }
 
 /**

@@ -90,33 +90,5 @@ function csrf_api_response(): array {
     ];
 }
 
-/**
- * Middleware function for API endpoints to validate CSRF
- * 
- * @param string|null $customToken Custom token to validate
- * @return bool True if valid, false otherwise
- */
-function csrf_api_middleware(?string $customToken = null): bool {
-    // Only validate for mutating requests (POST, PUT, PATCH, DELETE)
-    $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
-    if (!in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
-        return true; // Skip validation for GET requests
-    }
-    
-    if (!csrf_check($customToken)) {
-        http_response_code(400);
-        header('Content-Type: application/json');
-        echo json_encode([
-            'success' => false,
-            'code' => 'CSRF_MISMATCH',
-            'message' => 'CSRF token validation failed',
-            'timestamp' => date('c')
-        ]);
-        exit;
-    }
-    
-    return true;
-}
-
 // Auto-generate token on first load if not exists
 // Token generation is now handled by the unified system in csrf_unify.php

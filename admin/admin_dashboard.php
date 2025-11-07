@@ -149,6 +149,14 @@ include __DIR__ . '/../header.php';
     margin-top: 20px;
     border-top: 1px solid rgba(255,255,255,0.1);
   }
+  .e2e-status-loading {
+    color: #ccc;
+    font-style: italic;
+  }
+  .e2e-status-error {
+    color: #ff6b6b;
+    font-size: 12px;
+  }
 </style>
 </head>
 <body>
@@ -232,7 +240,91 @@ include __DIR__ . '/../header.php';
         <?php if ($stats['schema_issues'] > 0) echo "<span class='badge'>{$stats['schema_issues']} Issues</span>"; ?>
       </div>
     </div>
+
+    <!-- E2E Test Suite -->
+    <div class="card" onclick="window.location='../reports/e2e/index.html'">
+      <div class="card-content">
+        <h3>🧪 E2E Test Suite</h3>
+        <p>Monitor end-to-end test suite status. Run comprehensive platform validation tests.</p>
+        <a href="../reports/e2e/index.html" class="btn">View Reports</a>
+        <div id="e2e-status" class="e2e-status-loading">Loading E2E status...</div>
+      </div>
+    </div>
   </div>
+
+  <script>
+  // Fetch E2E status and update the card
+  function updateE2EStatus() {
+    const statusDiv = document.getElementById('e2e-status');
+    
+    fetch('../api/admin/e2e_status.php', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return response.json();
+    })
+    .then(data => {
+      if (data.success && data.data) {
+        const status = data.data;
+        let badgeHTML = '';
+        let statusText = '';
+        
+        if (status.has_ever_run) {
+          if (status.success) {
+            badgeHTML = '<span class="badge" style="background: linear-gradient(90deg, #4ecdc4, #45b7d1);">E2E Green</span>';
+            statusText = `✅ All tests passing (${status.pass_rate}%)`;
+          } else {
+            const failCount = status.failing_tests.length;
+            badgeHTML = `<span class="badge" style="background: linear-gradient(90deg, #ff6b6b, #ee5a52);">E2E Failing</span>`;
+            statusText = `❌ ${status.pass_rate}% pass rate, ${failCount} failing test(s)`;
+          }
+        } else {
+          badgeHTML = '<span class="badge" style="background: linear-gradient(90deg, #ffa726, #ff9800);">No Runs</span>';
+          statusText = 'No E2E tests have been run yet';
+        }
+        
+        // Update the card with status
+        const card = statusDiv.closest('.card');
+        const badge = card.querySelector('.badge');
+        
+        // Remove existing badge if it's not our E2E badge
+        if (badge && !badge.textContent.includes('E2E') && !badge.textContent.includes('Green') && !badge.textContent.includes('Failing') && !badge.textContent.includes('No Runs')) {
+          badge.remove();
+        }
+        
+        // Add or update E2E status badge
+        let e2eBadge = card.querySelector('.badge');
+        if (e2eBadge && (e2eBadge.textContent.includes('E2E') || e2eBadge.textContent.includes('Green') || e2eBadge.textContent.includes('Failing') || e2eBadge.textContent.includes('No Runs'))) {
+          e2eBadge.outerHTML = badgeHTML;
+        } else {
+          statusDiv.insertAdjacentHTML('afterend', badgeHTML);
+        }
+        
+        statusDiv.innerHTML = statusText;
+        statusDiv.style.color = status.success ? '#4ecdc4' : (status.has_ever_run ? '#ff6b6b' : '#ffa726');
+      } else {
+        throw new Error('Invalid response format');
+      }
+    })
+    .catch(error => {
+      statusDiv.innerHTML = '<span class="e2e-status-error">Error loading E2E status</span>';
+      console.error('E2E status fetch error:', error);
+    });
+  }
+  
+  // Update E2E status when page loads
+  document.addEventListener('DOMContentLoaded', updateE2EStatus);
+  
+  // Auto-refresh E2E status every 30 seconds
+  setInterval(updateE2EStatus, 30000);
+  </script>
 
   <div class="motivation">
     "The best traders aren't born — they're built through discipline, review, and guidance. You're the architect of excellence!"

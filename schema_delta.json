@@ -1,0 +1,103 @@
+{
+    "missing_tables": [],
+    "missing_columns": [
+        {
+            "table": "users",
+            "column": "trading_capital",
+            "type": "required"
+        },
+        {
+            "table": "users",
+            "column": "funds_available",
+            "type": "required"
+        },
+        {
+            "table": "trades",
+            "column": "user_id",
+            "type": "required"
+        },
+        {
+            "table": "trades",
+            "column": "position_percent",
+            "type": "frontend_required"
+        },
+        {
+            "table": "trades",
+            "column": "entry_price",
+            "type": "frontend_required"
+        },
+        {
+            "table": "trades",
+            "column": "stop_loss",
+            "type": "frontend_required"
+        },
+        {
+            "table": "trades",
+            "column": "target_price",
+            "type": "frontend_required"
+        },
+        {
+            "table": "trades",
+            "column": "pnl",
+            "type": "frontend_required"
+        },
+        {
+            "table": "trades",
+            "column": "allocation_amount",
+            "type": "frontend_required"
+        },
+        {
+            "table": "trades",
+            "column": "outcome",
+            "type": "frontend_required"
+        },
+        {
+            "table": "trades",
+            "column": "analysis_link",
+            "type": "frontend_required"
+        }
+    ],
+    "missing_indexes": [
+        {
+            "table": "users",
+            "index": "idx_email"
+        },
+        {
+            "table": "users",
+            "index": "idx_status"
+        },
+        {
+            "table": "users",
+            "index": "idx_role"
+        },
+        {
+            "table": "trades",
+            "index": "idx_user_symbol_date"
+        },
+        {
+            "table": "trades",
+            "index": "idx_user_status"
+        },
+        {
+            "table": "trades",
+            "index": "idx_symbol_date"
+        },
+        {
+            "table": "trades",
+            "index": "idx_deleted"
+        },
+        {
+            "table": "mtm_enrollments",
+            "index": "idx_trader_status"
+        },
+        {
+            "table": "mtm_models",
+            "index": "idx_code"
+        },
+        {
+            "table": "mtm_models",
+            "index": "idx_active"
+        }
+    ],
+    "inconsistencies": []
+}

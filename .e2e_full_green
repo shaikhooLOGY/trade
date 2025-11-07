@@ -1,0 +1,7 @@
+# E2E Test Status Flag
+# This file indicates E2E test suite status
+# Format: E2E_TESTS_STATUS|PASS_RATE|TIMESTAMP|MESSAGE
+
+E2E_TESTS_IN_PROGRESS|0.565|2025-11-07T02:07:51Z|E2E Logic stabilization in progress - Infrastructure ready, targeting ≥85% pass rate
+
+# Note: This flag will be set to "E2E_TESTS_FULL_GREEN" when pass rate reaches ≥85%

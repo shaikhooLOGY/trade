@@ -1,0 +1,1695 @@
+{
+    "database_name": "shaikhoology",
+    "tables": {
+        "agent_logs": {
+            "table_name": "agent_logs",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "int",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "agent_id",
+                    "type": "varchar(100)",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "event_type",
+                    "type": "varchar(50)",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "message",
+                    "type": "text",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "context",
+                    "type": "json",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "severity",
+                    "type": "enum('debug','info','warning','error','critical')",
+                    "null": "YES",
+                    "key": "MUL",
+                    "default": "info",
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "MUL",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_agent_id",
+                    "column_name": "agent_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_event_type",
+                    "column_name": "event_type",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_severity",
+                    "column_name": "severity",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_created_at",
+                    "column_name": "created_at",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "audit_event_types": {
+            "table_name": "audit_event_types",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "event_type",
+                    "type": "varchar(100)",
+                    "null": "NO",
+                    "key": "UNI",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "description",
+                    "type": "text",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "severity",
+                    "type": "enum('low','medium','high','critical')",
+                    "null": "NO",
+                    "key": "",
+                    "default": "medium",
+                    "extra": ""
+                },
+                {
+                    "field": "is_active",
+                    "type": "tinyint(1)",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": "1",
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "event_type",
+                    "column_name": "event_type",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_event_type",
+                    "column_name": "event_type",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_active",
+                    "column_name": "is_active",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "audit_events": {
+            "table_name": "audit_events",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "actor_id",
+                    "type": "bigint",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "action",
+                    "type": "varchar(100)",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "entity",
+                    "type": "varchar(50)",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "entity_id",
+                    "type": "bigint",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "summary",
+                    "type": "text",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "ip_address",
+                    "type": "varchar(45)",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "MUL",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_actor_id",
+                    "column_name": "actor_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_action",
+                    "column_name": "action",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_entity",
+                    "column_name": "entity",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_created_at",
+                    "column_name": "created_at",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_actor_action",
+                    "column_name": "actor_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_actor_action",
+                    "column_name": "action",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "idx_entity_type",
+                    "column_name": "entity",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_entity_type",
+                    "column_name": "entity_id",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "audit_logs": {
+            "table_name": "audit_logs",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "event_type_id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "actor_id",
+                    "type": "bigint unsigned",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "actor_type",
+                    "type": "enum('user','system','agent')",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": "user",
+                    "extra": ""
+                },
+                {
+                    "field": "entity_type",
+                    "type": "varchar(64)",
+                    "null": "YES",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "entity_id",
+                    "type": "bigint unsigned",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "event_data",
+                    "type": "text",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "ip_address",
+                    "type": "varchar(45)",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "user_agent",
+                    "type": "text",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "success",
+                    "type": "tinyint(1)",
+                    "null": "NO",
+                    "key": "",
+                    "default": "1",
+                    "extra": ""
+                },
+                {
+                    "field": "error_message",
+                    "type": "text",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "MUL",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_actor_type_id",
+                    "column_name": "actor_type",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_actor_type_id",
+                    "column_name": "actor_id",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "idx_entity_type_id",
+                    "column_name": "entity_type",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_entity_type_id",
+                    "column_name": "entity_id",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "idx_event_type_id",
+                    "column_name": "event_type_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_created_at",
+                    "column_name": "created_at",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "audit_retention_policies": {
+            "table_name": "audit_retention_policies",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "name",
+                    "type": "varchar(100)",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "event_types",
+                    "type": "json",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "retention_days",
+                    "type": "int",
+                    "null": "NO",
+                    "key": "",
+                    "default": "365",
+                    "extra": ""
+                },
+                {
+                    "field": "auto_delete",
+                    "type": "tinyint(1)",
+                    "null": "NO",
+                    "key": "",
+                    "default": "0",
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_name",
+                    "column_name": "name",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "guard_trade_limits": {
+            "table_name": "guard_trade_limits",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "user_id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "league_id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "max_trades_per_day",
+                    "type": "int",
+                    "null": "YES",
+                    "key": "",
+                    "default": "10",
+                    "extra": ""
+                },
+                {
+                    "field": "max_trades_per_week",
+                    "type": "int",
+                    "null": "YES",
+                    "key": "",
+                    "default": "50",
+                    "extra": ""
+                },
+                {
+                    "field": "max_trades_per_month",
+                    "type": "int",
+                    "null": "YES",
+                    "key": "",
+                    "default": "200",
+                    "extra": ""
+                },
+                {
+                    "field": "current_daily_trades",
+                    "type": "int",
+                    "null": "YES",
+                    "key": "",
+                    "default": "0",
+                    "extra": ""
+                },
+                {
+                    "field": "current_weekly_trades",
+                    "type": "int",
+                    "null": "YES",
+                    "key": "",
+                    "default": "0",
+                    "extra": ""
+                },
+                {
+                    "field": "current_monthly_trades",
+                    "type": "int",
+                    "null": "YES",
+                    "key": "",
+                    "default": "0",
+                    "extra": ""
+                },
+                {
+                    "field": "last_daily_reset",
+                    "type": "date",
+                    "null": "YES",
+                    "key": "",
+                    "default": "curdate()",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "last_weekly_reset",
+                    "type": "date",
+                    "null": "YES",
+                    "key": "",
+                    "default": "(curdate() - interval weekday(curdate()) day)",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "last_monthly_reset",
+                    "type": "date",
+                    "null": "YES",
+                    "key": "",
+                    "default": "(curdate() - interval (dayofmonth(curdate()) - 1) day)",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "unique_user_league",
+                    "column_name": "user_id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "unique_user_league",
+                    "column_name": "league_id",
+                    "non_unique": "0",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "idx_user_id",
+                    "column_name": "user_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_league_id",
+                    "column_name": "league_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "idempotency_keys": {
+            "table_name": "idempotency_keys",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "int",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "key_hash",
+                    "type": "varchar(64)",
+                    "null": "NO",
+                    "key": "UNI",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "request_hash",
+                    "type": "varchar(64)",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "response_data",
+                    "type": "longtext",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "status_code",
+                    "type": "int",
+                    "null": "YES",
+                    "key": "",
+                    "default": "200",
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "MUL",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "unique_key_hash",
+                    "column_name": "key_hash",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_key_hash",
+                    "column_name": "key_hash",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_created_at",
+                    "column_name": "created_at",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "leagues": {
+            "table_name": "leagues",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "name",
+                    "type": "varchar(255)",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "description",
+                    "type": "text",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "start_date",
+                    "type": "date",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "end_date",
+                    "type": "date",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "max_participants",
+                    "type": "int",
+                    "null": "YES",
+                    "key": "",
+                    "default": "100",
+                    "extra": ""
+                },
+                {
+                    "field": "entry_fee",
+                    "type": "decimal(10,2)",
+                    "null": "YES",
+                    "key": "",
+                    "default": "0.00",
+                    "extra": ""
+                },
+                {
+                    "field": "status",
+                    "type": "enum('draft','active','completed','cancelled')",
+                    "null": "YES",
+                    "key": "MUL",
+                    "default": "draft",
+                    "extra": ""
+                },
+                {
+                    "field": "created_by",
+                    "type": "bigint unsigned",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_status",
+                    "column_name": "status",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_dates",
+                    "column_name": "start_date",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_dates",
+                    "column_name": "end_date",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "mtm_enrollments": {
+            "table_name": "mtm_enrollments",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "trader_id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "user_id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "model_id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "tier",
+                    "type": "enum('basic','intermediate','advanced')",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "status",
+                    "type": "enum('active','paused','completed','cancelled')",
+                    "null": "NO",
+                    "key": "",
+                    "default": "active",
+                    "extra": ""
+                },
+                {
+                    "field": "approved_at",
+                    "type": "datetime",
+                    "null": "YES",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "requested_at",
+                    "type": "datetime",
+                    "null": "YES",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "started_at",
+                    "type": "datetime",
+                    "null": "NO",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "completed_at",
+                    "type": "datetime",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "uq_trader_model",
+                    "column_name": "trader_id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "uq_trader_model",
+                    "column_name": "model_id",
+                    "non_unique": "0",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "uq_enrollment_user_model",
+                    "column_name": "user_id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "uq_enrollment_user_model",
+                    "column_name": "model_id",
+                    "non_unique": "0",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "uq_user_model",
+                    "column_name": "trader_id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "uq_user_model",
+                    "column_name": "model_id",
+                    "non_unique": "0",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "trader_id",
+                    "column_name": "trader_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "trader_id",
+                    "column_name": "status",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "user_id",
+                    "column_name": "user_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "approved_at",
+                    "column_name": "approved_at",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "requested_at",
+                    "column_name": "requested_at",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_model_status",
+                    "column_name": "model_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_model_status",
+                    "column_name": "status",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "mtm_models": {
+            "table_name": "mtm_models",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "code",
+                    "type": "varchar(64)",
+                    "null": "NO",
+                    "key": "UNI",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "name",
+                    "type": "varchar(190)",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "title",
+                    "type": "varchar(190)",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "difficulty",
+                    "type": "enum('basic','intermediate','advanced')",
+                    "null": "NO",
+                    "key": "",
+                    "default": "basic",
+                    "extra": ""
+                },
+                {
+                    "field": "cover_image_path",
+                    "type": "varchar(255)",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "tiering",
+                    "type": "text",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "is_active",
+                    "type": "tinyint(1)",
+                    "null": "NO",
+                    "key": "",
+                    "default": "1",
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "code",
+                    "column_name": "code",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "mtm_tasks": {
+            "table_name": "mtm_tasks",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "model_id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "tier",
+                    "type": "enum('basic','intermediate','advanced')",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "level",
+                    "type": "enum('basic','medium','hard')",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "rule_config",
+                    "type": "text",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "sort_order",
+                    "type": "int",
+                    "null": "NO",
+                    "key": "",
+                    "default": "0",
+                    "extra": ""
+                },
+                {
+                    "field": "is_active",
+                    "type": "tinyint(1)",
+                    "null": "NO",
+                    "key": "",
+                    "default": "1",
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_model_tier_level",
+                    "column_name": "model_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_model_tier_level",
+                    "column_name": "tier",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "idx_model_tier_level",
+                    "column_name": "level",
+                    "non_unique": "1",
+                    "seq_in_index": "3"
+                },
+                {
+                    "key_name": "idx_model_tier_level",
+                    "column_name": "sort_order",
+                    "non_unique": "1",
+                    "seq_in_index": "4"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "rate_limits": {
+            "table_name": "rate_limits",
+            "columns": [
+                {
+                    "field": "bucket",
+                    "type": "varchar(64)",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "actor_key",
+                    "type": "varchar(128)",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "window_start",
+                    "type": "datetime",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "count",
+                    "type": "int",
+                    "null": "NO",
+                    "key": "",
+                    "default": "0",
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "bucket",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "actor_key",
+                    "non_unique": "0",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "window_start",
+                    "non_unique": "0",
+                    "seq_in_index": "3"
+                },
+                {
+                    "key_name": "idx_rate_limit_lookup",
+                    "column_name": "bucket",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_rate_limit_lookup",
+                    "column_name": "actor_key",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "idx_rate_limit_lookup",
+                    "column_name": "window_start",
+                    "non_unique": "1",
+                    "seq_in_index": "3"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "schema_migrations": {
+            "table_name": "schema_migrations",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "int",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "version",
+                    "type": "varchar(50)",
+                    "null": "NO",
+                    "key": "UNI",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "applied_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "version",
+                    "column_name": "version",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "trades": {
+            "table_name": "trades",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "trader_id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "symbol",
+                    "type": "varchar(32)",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "side",
+                    "type": "enum('buy','sell')",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "quantity",
+                    "type": "decimal(16,4)",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "price",
+                    "type": "decimal(16,4)",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "opened_at",
+                    "type": "datetime",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "closed_at",
+                    "type": "datetime",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "notes",
+                    "type": "text",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "trader_id",
+                    "column_name": "trader_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "trader_id",
+                    "column_name": "symbol",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                },
+                {
+                    "key_name": "trader_id",
+                    "column_name": "opened_at",
+                    "non_unique": "1",
+                    "seq_in_index": "3"
+                },
+                {
+                    "key_name": "idx_trader_date_range",
+                    "column_name": "trader_id",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_trader_date_range",
+                    "column_name": "opened_at",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                }
+            ],
+            "foreign_keys": []
+        },
+        "users": {
+            "table_name": "users",
+            "columns": [
+                {
+                    "field": "id",
+                    "type": "bigint unsigned",
+                    "null": "NO",
+                    "key": "PRI",
+                    "default": null,
+                    "extra": "auto_increment"
+                },
+                {
+                    "field": "name",
+                    "type": "varchar(190)",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "email",
+                    "type": "varchar(190)",
+                    "null": "NO",
+                    "key": "UNI",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "password",
+                    "type": "varchar(255)",
+                    "null": "NO",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "password_hash",
+                    "type": "varchar(255)",
+                    "null": "YES",
+                    "key": "",
+                    "default": null,
+                    "extra": ""
+                },
+                {
+                    "field": "is_admin",
+                    "type": "tinyint(1)",
+                    "null": "NO",
+                    "key": "",
+                    "default": "0",
+                    "extra": ""
+                },
+                {
+                    "field": "role",
+                    "type": "enum('user','admin','superadmin')",
+                    "null": "NO",
+                    "key": "",
+                    "default": "user",
+                    "extra": ""
+                },
+                {
+                    "field": "status",
+                    "type": "enum('pending','active','suspended')",
+                    "null": "NO",
+                    "key": "MUL",
+                    "default": "active",
+                    "extra": ""
+                },
+                {
+                    "field": "email_verified",
+                    "type": "tinyint(1)",
+                    "null": "NO",
+                    "key": "",
+                    "default": "1",
+                    "extra": ""
+                },
+                {
+                    "field": "verified",
+                    "type": "tinyint(1)",
+                    "null": "NO",
+                    "key": "",
+                    "default": "1",
+                    "extra": ""
+                },
+                {
+                    "field": "created_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED"
+                },
+                {
+                    "field": "updated_at",
+                    "type": "timestamp",
+                    "null": "YES",
+                    "key": "",
+                    "default": "CURRENT_TIMESTAMP",
+                    "extra": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "key_name": "PRIMARY",
+                    "column_name": "id",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "email",
+                    "column_name": "email",
+                    "non_unique": "0",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_status_created",
+                    "column_name": "status",
+                    "non_unique": "1",
+                    "seq_in_index": "1"
+                },
+                {
+                    "key_name": "idx_status_created",
+                    "column_name": "created_at",
+                    "non_unique": "1",
+                    "seq_in_index": "2"
+                }
+            ],
+            "foreign_keys": []
+        }
+    }
+}

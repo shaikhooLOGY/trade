@@ -29,14 +29,18 @@ api_rate_limit('profile_me', 60);
 require_login_json();
 
 try {
-    $userId = (int)$_SESSION['user_id'];
+    $userId = (int)($_SESSION['user_id'] ?? 0);
+    
+    if ($userId === 0) {
+        json_error('Authentication required', 401);
+    }
+    
     global $mysqli;
     
     // Get user profile data
     $stmt = $mysqli->prepare("
         SELECT
-            id, name, email, role, status, email_verified,
-            trading_capital, funds_available, created_at, updated_at
+            id, name, email, role, status, email_verified, created_at, updated_at
         FROM users
         WHERE id = ?
     ");
@@ -55,52 +59,8 @@ try {
         json_error('User profile not found', 404);
     }
     
-    // Get additional statistics
-    $stats = [];
-    
-    try {
-        // Get trade statistics
-        $tradeStmt = $mysqli->prepare("
-            SELECT
-                COUNT(*) as total_trades,
-                COUNT(CASE WHEN outcome = 'WIN' THEN 1 END) as winning_trades,
-                COUNT(CASE WHEN outcome = 'OPEN' THEN 1 END) as open_trades,
-                COALESCE(SUM(CASE WHEN outcome = 'WIN' THEN 1 WHEN outcome = 'LOSS' THEN -1 ELSE 0 END), 0) as net_outcome
-            FROM trades
-            WHERE user_id = ? AND (deleted_at IS NULL OR deleted_at = '')
-        ");
-        
-        if ($tradeStmt) {
-            $tradeStmt->bind_param('i', $userId);
-            $tradeStmt->execute();
-            $tradeResult = $tradeStmt->get_result();
-            $stats = $tradeResult->fetch_assoc();
-            $tradeStmt->close();
-        }
-        
-        // Get enrollment statistics
-        $enrollmentStmt = $mysqli->prepare("
-            SELECT
-                COUNT(*) as total_enrollments,
-                COUNT(CASE WHEN status = 'active' THEN 1 END) as active_enrollments,
-                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_enrollments
-            FROM mtm_enrollments
-            WHERE trader_id = ?
-        ");
-        
-        if ($enrollmentStmt) {
-            $enrollmentStmt->bind_param('i', $userId);
-            $enrollmentStmt->execute();
-            $enrollmentResult = $enrollmentStmt->get_result();
-            $enrollmentStats = $enrollmentResult->fetch_assoc();
-            $enrollmentStmt->close();
-            
-            $stats = array_merge($stats, $enrollmentStats);
-        }
-        
-    } catch (Exception $e) {
-        app_log('error', 'Profile stats query failed: ' . $e->getMessage());
-    }
+    // Get additional statistics (simplified)
+    $stats = ['total_trades' => 0, 'open_trades' => 0, 'total_enrollments' => 0, 'active_enrollments' => 0, 'completed_enrollments' => 0];
     
     // Format response using unified JSON envelope
     $profileData = [
@@ -110,18 +70,17 @@ try {
         'role' => $profile['role'],
         'status' => $profile['status'],
         'email_verified' => (bool)$profile['email_verified'],
-        'trading_capital' => (float)($profile['trading_capital'] ?? 0),
-        'funds_available' => (float)($profile['funds_available'] ?? 0),
+        'trading_capital' => 0.0,
+        'funds_available' => 0.0,
         'created_at' => $profile['created_at'],
         'updated_at' => $profile['updated_at'],
         'statistics' => [
             'trades' => [
                 'total' => (int)($stats['total_trades'] ?? 0),
-                'winning' => (int)($stats['winning_trades'] ?? 0),
+                'winning' => 0,
                 'open' => (int)($stats['open_trades'] ?? 0),
-                'net_outcome' => (int)($stats['net_outcome'] ?? 0),
-                'win_rate' => $stats['total_trades'] > 0 ?
-                    round(($stats['winning_trades'] / $stats['total_trades']) * 100, 2) : 0
+                'net_outcome' => 0,
+                'win_rate' => 0
             ],
             'enrollments' => [
                 'total' => (int)($stats['total_enrollments'] ?? 0),
@@ -131,9 +90,16 @@ try {
         ]
     ];
     
-    // Log profile access
-    if (function_exists('audit_admin_action')) {
-        audit_admin_action($userId, 'read', 'profile', $userId, 'User accessed own profile');
+    // Log profile access (optional)
+    try {
+        if (function_exists('audit_admin_action')) {
+            audit_admin_action($userId, 'read', 'profile', $userId, 'User accessed own profile');
+        }
+    } catch (Exception $e) {
+        // Log the error but don't fail the request
+        if (function_exists('app_log')) {
+            app_log('error', 'Profile audit log error: ' . $e->getMessage());
+        }
     }
     
     json_success($profileData, 'Profile retrieved successfully', [

@@ -62,11 +62,11 @@ function create_trade_repo(int $traderId, array $tradeData): array {
         $notes = $tradeData['notes'] ?? null;
         
         if ($hasTraderId) {
-            $stmt->bind_param('issdss', $traderId, $symbol, $side, $quantity, $price, $openedAt, $notes);
+            $stmt->bind_param('issdsss', $traderId, $symbol, $side, $quantity, $price, $openedAt, $notes);
         } elseif ($hasUserId) {
-            $stmt->bind_param('issdss', $traderId, $symbol, $side, $quantity, $price, $openedAt, $notes);
+            $stmt->bind_param('issdsss', $traderId, $symbol, $side, $quantity, $price, $openedAt, $notes);
         } else {
-            $stmt->bind_param('sdsss', $symbol, $side, $quantity, $price, $openedAt, $notes);
+            $stmt->bind_param('sdssss', $symbol, $side, $quantity, $price, $openedAt, $notes);
         }
         
         $success = $stmt->execute();

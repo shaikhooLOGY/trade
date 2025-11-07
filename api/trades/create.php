@@ -19,11 +19,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_fail('INVALID_INPUT', 'Only POST requests are allowed');
 }
 
-// Require authentication and active user
-require_active_user_json('Authentication required');
-
 // CSRF protection for mutating requests - E2E test bypass
 require_csrf_json();
+
+// Require authentication and active user
+require_active_user_json('Authentication required');
 
 // Rate limiting: 30 per minute
 require_rate_limit('api:trades:create', 30);

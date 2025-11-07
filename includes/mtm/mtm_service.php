@@ -5,6 +5,85 @@
  * Core business logic for TMS-MTM module
  */
 
+// Application Logging Function
+if (!function_exists('app_log')) {
+    /**
+     * Log application events
+     *
+     * @param array|string $data Data to log (supports both array and legacy string format)
+     * @param string|null $message Optional message (for legacy string format)
+     * @return bool Success status
+     */
+    function app_log($data, ?string $message = null): bool {
+        try {
+            $mysqli = $GLOBALS['mysqli'];
+            
+            // Handle legacy string format: app_log('level', 'message')
+            if (is_string($data) && $message !== null) {
+                $logData = json_encode([
+                    'event' => 'legacy_log',
+                    'level' => $data,
+                    'message' => $message,
+                    'timestamp' => date('Y-m-d H:i:s'),
+                    'ip' => $_SERVER['REMOTE_ADDR'] ?? 'unknown',
+                    'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? 'unknown',
+                    'user_id' => $_SESSION['user_id'] ?? null
+                ]);
+                $event = $data . '_' . substr(md5($message), 0, 8);
+            } else {
+                // New array format: app_log(['event' => 'something', 'data' => '...'])
+                $data = (array)$data;
+                $event = $data['event'] ?? 'unknown';
+                $userId = $_SESSION['user_id'] ?? null;
+                $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+                $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? 'unknown';
+                $timestamp = date('Y-m-d H:i:s');
+                
+                $logData = json_encode([
+                    'timestamp' => $timestamp,
+                    'ip' => $ip,
+                    'user_agent' => $userAgent,
+                    'user_id' => $userId,
+                    'data' => $data
+                ]);
+            }
+            
+            // Try to insert into application log table, fall back to error_log if table doesn't exist
+            try {
+                $stmt = $mysqli->prepare("
+                    INSERT INTO application_log (event_type, user_id, log_data, created_at)
+                    VALUES (?, ?, ?, ?)
+                    ON DUPLICATE KEY UPDATE
+                    log_data = VALUES(log_data),
+                    created_at = VALUES(created_at)
+                ");
+                
+                if ($stmt) {
+                    $userId = $_SESSION['user_id'] ?? null;
+                    $timestamp = date('Y-m-d H:i:s');
+                    $stmt->bind_param('siss', $event, $userId, $logData, $timestamp);
+                    $result = $stmt->execute();
+                    $stmt->close();
+                    return $result;
+                } else {
+                    // Table might not exist, fall back to error_log
+                    error_log("MTM Service Log (DB unavailable): " . $logData);
+                    return false;
+                }
+            } catch (Exception $dbException) {
+                // Fallback: log to error_log if database insert fails
+                error_log("MTM Service Log (DB error): " . $logData);
+                return false;
+            }
+            
+        } catch (Exception $e) {
+            // Fallback: log to error_log
+            error_log("MTM Service Log Error: " . $e->getMessage());
+            return false;
+        }
+    }
+}
+
 if (!function_exists('mtm_enroll')) {
     /**
      * Enroll a trader in an MTM model

@@ -17,11 +17,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     json_fail('METHOD_NOT_ALLOWED', 'Only POST method is allowed');
 }
 
-// Require authentication and active user
-require_active_user_json('Authentication required');
-
 // CSRF protection for mutating requests - E2E test bypass
 require_csrf_json();
+
+// Require authentication and active user
+require_active_user_json('Authentication required');
 
 // Rate limiting: 5 per minute for enrollment creation
 require_rate_limit('mtm_enroll_create', 5);
