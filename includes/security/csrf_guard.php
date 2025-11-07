@@ -33,13 +33,20 @@ function require_csrf_json(): bool {
     
     // E2E test detection and bypass
     $isE2E = (
-        getenv('ALLOW_CSRF_BYPASS') === '1' ||
+        getenv('ALLOW_CSRF_BYPASS') === '1' && getenv('APP_ENV') === 'local' ||
         ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest' ||
         strpos($_SERVER['HTTP_USER_AGENT'] ?? '', 'E2E') !== false
     );
     
     if ($isE2E) {
-        // Allow E2E tests to bypass CSRF validation
+        // Allow E2E tests to bypass CSRF validation with audit logging
+        if (function_exists('app_log')) {
+            app_log('security', 'csrf_bypass_e2e', [
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? '',
+                'request_uri' => $_SERVER['REQUEST_URI'] ?? '',
+                'bypass_reason' => 'e2e_mode'
+            ]);
+        }
         return true;
     }
     

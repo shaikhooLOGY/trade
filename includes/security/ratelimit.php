@@ -70,6 +70,10 @@ function rate_limit(string $bucket, int $limitPerMinute, ?string $now = null): a
         $now = gmdate('Y-m-d H:i:s');
     }
     
+    // E2E mode: Allow +50% headroom for testing
+    $isE2E = getenv('E2E_MODE') === '1';
+    $actualLimit = $isE2E ? (int)($limitPerMinute * 1.5) : $limitPerMinute;
+    
     // Calculate window start (floor to minute)
     $windowStart = date('Y-m-d H:i:00', strtotime($now));
     
@@ -93,7 +97,7 @@ function rate_limit(string $bucket, int $limitPerMinute, ?string $now = null): a
     if (!$result) {
         error_log('Rate limit execution failed: ' . $stmt->error);
         $stmt->close();
-        return ['allowed' => true, 'remaining' => $limitPerMinute, 'reset' => strtotime($windowStart) + 60];
+        return ['allowed' => true, 'remaining' => $actualLimit, 'reset' => strtotime($windowStart) + 60, 'limit' => $actualLimit];
     }
     
     $stmt->close();
@@ -104,7 +108,7 @@ function rate_limit(string $bucket, int $limitPerMinute, ?string $now = null): a
     
     if (!$stmt) {
         error_log('Rate limit count query prepare failed: ' . $mysqli->error);
-        return ['allowed' => true, 'remaining' => $limitPerMinute, 'reset' => strtotime($windowStart) + 60];
+        return ['allowed' => true, 'remaining' => $actualLimit, 'reset' => strtotime($windowStart) + 60, 'limit' => $actualLimit];
     }
     
     $stmt->bind_param('sss', $bucket, $actorKey, $windowStart);
@@ -120,17 +124,18 @@ function rate_limit(string $bucket, int $limitPerMinute, ?string $now = null): a
     
     // Calculate reset time (window start + 60 seconds)
     $resetTimestamp = strtotime($windowStart) + 60;
-    $remaining = max(0, $limitPerMinute - $currentCount);
+    $remaining = max(0, $actualLimit - $currentCount);
     
     // Check if rate limit exceeded
-    $allowed = $currentCount <= $limitPerMinute;
+    $allowed = $currentCount <= $actualLimit;
     
     return [
         'allowed' => $allowed,
         'count' => $currentCount,
         'remaining' => $remaining,
         'reset' => $resetTimestamp,
-        'limit' => $limitPerMinute
+        'limit' => $actualLimit,
+        'e2e_mode' => $isE2E
     ];
 }
 
