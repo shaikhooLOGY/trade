@@ -7,8 +7,12 @@
     <div style="font-size:12px; color:#888; line-height:1.4; max-width:800px; margin:0 auto;">
       <strong>Educational Platform:</strong> For educational purposes only. Not SEBI registered.
       Trading involves risk of loss.
-      <a href="disclaimer.php" style="color:#4CAF50; text-decoration:none; font-weight:bold;">
-        Learn More →
+      <a href="disclaimer.php" style="color:#4CAF50; text-decoration:none; font-weight:bold; margin-left:10px;">
+        Disclaimer
+      </a>
+      <span style="color:#666;">|</span>
+      <a href="privacy_policy.php" style="color:#4CAF50; text-decoration:none; font-weight:bold; margin-left:10px;">
+        Privacy Policy
       </a>
     </div>
   </footer>

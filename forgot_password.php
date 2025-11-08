@@ -11,9 +11,9 @@ if (empty($_SESSION['fp_csrf'])) {
 }
 $csrf = $_SESSION['fp_csrf'];
 
-// --------- Cooldown (10 minutes) ----------
+// --------- Cooldown (1 minute) ----------
 if (!isset($_SESSION['fp_next_ok_at'])) $_SESSION['fp_next_ok_at'] = 0;
-$COOLDOWN_SECONDS = 10 * 60;     // 10 minutes
+$COOLDOWN_SECONDS = 1 * 60;     // 1 minute
 $TOKEN_LIFETIME   = 60 * 60;     // 1 hour link validity
 
 $err = '';
@@ -37,9 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $err = 'Please enter a valid email. (Sahi email daliyé)';
     } else {
         // Neutral success message (no user enumeration)
-        $ok = "If this email is registered, we’ve sent a password reset link. Check your inbox or spam. "
+        $ok = "If this email is registered, we've sent a password reset link. Check your inbox or spam. "
             . "(Agar yeh email registered hai, humne reset link bhej diya hai. Inbox/Spam check karein.) "
-            . "You can request a new link after 10 minutes. (Naya link 10 minutes ke baad hi mang sakte hain.)";
+            . "You can request a new link after 1 minute. (Naya link 1 minute ke baad hi mang sakte hain.)";
 
         // Start cooldown
         $_SESSION['fp_next_ok_at'] = time() + $COOLDOWN_SECONDS;
@@ -151,9 +151,9 @@ $hideNav = true; include __DIR__ . '/header.php';
   <?php if ($ok): ?>
     <div class="alert-ok" id="okBox">
       <ul style="margin:0;padding-left:18px">
-        <li>If this email is registered, we’ve sent a password reset link. Check your inbox or spam.</li>
+        <li>If this email is registered, we've sent a password reset link. Check your inbox or spam.</li>
         <li><em>(Agar yeh email registered hai, humne reset link bhej diya hai. Inbox/Spam check karein.)</em></li>
-        <li>You can request a new link after <strong>10 minutes</strong>. <em>(Naya link 10 minutes ke baad hi mang sakte hain.)</em></li>
+        <li>You can request a new link after <strong>1 minute</strong>. <em>(Naya link 1 minute ke baad hi mang sakte hain.)</em></li>
       </ul>
       <div class="clock-wrap" id="cooldownUI">
         <svg class="circle" viewBox="0 0 64 64">
@@ -161,7 +161,7 @@ $hideNav = true; include __DIR__ . '/header.php';
           <circle class="progress" cx="32" cy="32" r="30"></circle>
         </svg>
         <div class="clock-text">
-          Next request in <span id="clock">10:00</span>
+          Next request in <span id="clock">01:00</span>
         </div>
       </div>
       <div class="zikr">
@@ -183,9 +183,9 @@ $hideNav = true; include __DIR__ . '/header.php';
   <div id="okTemplate" style="display:none">
     <div class="alert-ok" id="okBoxTpl">
       <ul style="margin:0;padding-left:18px">
-        <li>If this email is registered, we’ve sent a password reset link. Check your inbox or spam.</li>
+        <li>If this email is registered, we've sent a password reset link. Check your inbox or spam.</li>
         <li><em>(Agar yeh email registered hai, humne reset link bhej diya hai. Inbox/Spam check karein.)</em></li>
-        <li>You can request a new link after <strong>10 minutes</strong>. <em>(Naya link 10 minutes ke baad hi mang sakte hain.)</em></li>
+        <li>You can request a new link after <strong>1 minute</strong>. <em>(Naya link 1 minute ke baad hi mang sakte hain.)</em></li>
       </ul>
       <div class="clock-wrap" id="cooldownUITpl">
         <svg class="circle" viewBox="0 0 64 64">
@@ -193,7 +193,7 @@ $hideNav = true; include __DIR__ . '/header.php';
           <circle class="progress" cx="32" cy="32" r="30"></circle>
         </svg>
         <div class="clock-text">
-          Next request in <span class="clock">10:00</span>
+          Next request in <span class="clock">01:00</span>
         </div>
       </div>
       <div class="zikr">
@@ -245,7 +245,7 @@ const submit   = document.getElementById('submitBtn');
 const okBox    = document.getElementById('okBox');            // may exist (after POST)
 const okTpl    = document.getElementById('okTemplate');       // hidden template
 
-const COOLDOWN_SECONDS = 600; // 10 min
+const COOLDOWN_SECONDS = 60; // 1 min
 const CIRC = 188.5;           // circumference for r=30
 
 function setDisabled(d){

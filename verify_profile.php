@@ -5,7 +5,6 @@
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 require_once __DIR__ . '/config.php';   // $mysqli
-require_once __DIR__ . '/config_local.php'; // Load local development config
 require_once __DIR__ . '/mailer.php';   // sendMail($to,$subject,$html,$text='')
 
 // ---------- helpers ----------
@@ -17,6 +16,33 @@ if (empty($_SESSION['vp_csrf'])) {
     $_SESSION['vp_csrf'] = bin2hex(random_bytes(16));
 }
 $csrf = $_SESSION['vp_csrf'];
+
+// ---------- Rate Limiting (OTP Verification Attempts) ----------
+$MAX_OTP_ATTEMPTS = 5;
+$OTP_WINDOW = 300; // 5 minutes
+$current_time = time();
+
+if (!isset($_SESSION['otp_attempts'])) {
+    $_SESSION['otp_attempts'] = [];
+}
+
+// Clean old attempts
+if (!empty($_SESSION['otp_attempts'])) {
+    foreach ($_SESSION['otp_attempts'] as $timestamp) {
+        if ($current_time - $timestamp > $OTP_WINDOW) {
+            unset($_SESSION['otp_attempts']);
+        }
+    }
+}
+$otp_rate_limited = false;
+if (!empty($_SESSION['otp_attempts']) && count($_SESSION['otp_attempts']) >= $MAX_OTP_ATTEMPTS) {
+    $oldest_attempt = min($_SESSION['otp_attempts']);
+    $cooldown_remaining = $OTP_WINDOW - ($current_time - $oldest_attempt);
+    if ($cooldown_remaining > 0) {
+        $otp_rate_limited = true;
+        $err_msgs[] = "Too many OTP attempts. Please wait " . ceil($cooldown_remaining/60) . " minutes before trying again.";
+    }
+}
 
 // Inputs
 $email  = isset($_GET['email']) ? trim((string)$_GET['email']) : '';
@@ -131,32 +157,41 @@ if (!$err_msgs && $user) {
 
 // ---------- VERIFY ----------
 if (!$err_msgs && $user && isset($_POST['verify']) && isset($_POST['csrf']) && hash_equals($csrf, (string)$_POST['csrf'])) {
-    $code = only_digits($_POST['otp'] ?? '');
-    if ($code === '' || strlen($code) !== 6) {
-        $err_msgs[] = "Please enter a 6-digit code. (6 huroof ka code daliyé.)";
+    if ($otp_rate_limited) {
+        $err_msgs[] = "Too many attempts. Please wait before trying again.";
     } else {
-        $db_code = (string)($user['otp_code'] ?? '');
-        $db_exp  = (string)($user['otp_expires'] ?? '');
-        $isValid = ($code === $db_code) && $db_exp && (strtotime($db_exp) > time());
-
-        if (!$isValid) {
-            $err_msgs[] = "Invalid or expired code. (Code galat ya expire ho chuka hai.)";
+        $code = only_digits($_POST['otp'] ?? '');
+        if ($code === '' || strlen($code) !== 6) {
+            $err_msgs[] = "Please enter a 6-digit code. (6 huroof ka code daliyé.)";
         } else {
-            // mark verified but keep status pending for admin approval
-            if ($up = $mysqli->prepare("UPDATE users SET email_verified=1, status='pending', otp_code=NULL, otp_expires=NULL WHERE id=?")) {
-                $up->bind_param('i', $user['id']);
-                if ($up->execute()) {
-                    $up->close();
-                    $_SESSION['email_verified'] = 1;
-                    $_SESSION['status'] = 'pending';
-                    header('Location: /pending_approval.php?just_verified=1');
-                    exit;
-                } else {
-                    $up->close();
-                    $err_msgs[] = "Could not verify now. Please try again.";
-                }
+            $db_code = (string)($user['otp_code'] ?? '');
+            $db_exp  = (string)($user['otp_expires'] ?? '');
+            $isValid = ($code === $db_code) && $db_exp && (strtotime($db_exp) > time());
+
+            if (!$isValid) {
+                // Track failed attempt
+                $_SESSION['otp_attempts'][] = time();
+                $err_msgs[] = "Invalid or expired code. (Code galat ya expire ho chuka hai.)";
             } else {
-                $err_msgs[] = "Database error while verifying.";
+                // Successful verification - clear attempts
+                unset($_SESSION['otp_attempts']);
+                
+                // mark verified but keep status pending for admin approval
+                if ($up = $mysqli->prepare("UPDATE users SET email_verified=1, status='pending', otp_code=NULL, otp_expires=NULL WHERE id=?")) {
+                    $up->bind_param('i', $user['id']);
+                    if ($up->execute()) {
+                        $up->close();
+                        $_SESSION['email_verified'] = 1;
+                        $_SESSION['status'] = 'pending';
+                        header('Location: /pending_approval.php?just_verified=1');
+                        exit;
+                    } else {
+                        $up->close();
+                        $err_msgs[] = "Could not verify now. Please try again.";
+                    }
+                } else {
+                    $err_msgs[] = "Database error while verifying.";
+                }
             }
         }
     }

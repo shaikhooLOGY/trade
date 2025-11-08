@@ -8,7 +8,11 @@
 if (!defined('APP_ENV')) {
     $appEnv = 'local'; // default if .env missing
 
+    // Check both possible locations for .env file
     $envFile = __DIR__ . '/../.env';
+    if (!file_exists($envFile)) {
+        $envFile = __DIR__ . '/.env';
+    }
     if (is_readable($envFile)) {
         $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
         foreach ($lines as $line) {

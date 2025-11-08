@@ -12,14 +12,8 @@ if (!$uid) { header('Location: users.php'); exit; }
 if (empty($_SESSION['admin_csrf'])) $_SESSION['admin_csrf'] = bin2hex(random_bytes(16));
 $csrf = $_SESSION['admin_csrf'];
 
-/* Load user (and reviewer/promoter names) */
-$sql = "SELECT u.*,
-               rb.name AS reviewer_name,
-               pb.name AS promoter_name
-        FROM users u
-        LEFT JOIN users rb ON rb.id = u.last_reviewed_by
-        LEFT JOIN users pb ON pb.id = u.promoted_by
-        WHERE u.id = ? LIMIT 1";
+/* Load user */
+$sql = "SELECT * FROM users WHERE id = ? LIMIT 1";
 $st = $mysqli->prepare($sql);
 $st->bind_param('i', $uid);
 $st->execute();
@@ -46,14 +40,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && hash_equals($csrf, $_POST['csrf'] ?
     $act = $_POST['action'] ?? '';
     if ($act === 'approve') {
         if (!in_array($user['status'], ['active','approved'], true)) {
-            $st = $mysqli->prepare("UPDATE users SET status='active', profile_status='approved', last_reviewed_by=?, last_reviewed_at=NOW() WHERE id=?");
-            $st->bind_param('ii', $me, $uid);
+            $st = $mysqli->prepare("UPDATE users SET status='active' WHERE id=?");
+            $st->bind_param('i', $uid);
             $st->execute(); $st->close();
             $actionTaken = 'Approved';
             $user['status'] = 'active';
-            $user['profile_status'] = 'approved';
-            $user['last_reviewed_by'] = $me;
-            $user['last_reviewed_at'] = date('Y-m-d H:i:s');
         }
     } elseif ($act === 'send_back') {
         // Ask user to update (needs_update) + optional per-field remarks
@@ -64,44 +55,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && hash_equals($csrf, $_POST['csrf'] ?
         if ($status_json || $comments_json || $reason !== '') {
             // Explicit variants for clean binding
             if ($status_json && $comments_json && $reason !== '') {
-                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_status='needs_update', profile_field_status=?, profile_comments=?, rejection_reason=?, last_reviewed_by=?, last_reviewed_at=NOW() WHERE id=?");
-                $st->bind_param('sssii', $status_json, $comments_json, $reason, $me, $uid);
+                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_field_status=?, profile_comments=?, rejection_reason=? WHERE id=?");
+                $st->bind_param('sssi', $status_json, $comments_json, $reason, $uid);
             } elseif ($status_json && $comments_json) {
-                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_status='needs_update', profile_field_status=?, profile_comments=?, last_reviewed_by=?, last_reviewed_at=NOW() WHERE id=?");
-                $st->bind_param('ssii', $status_json, $comments_json, $me, $uid);
+                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_field_status=?, profile_comments=? WHERE id=?");
+                $st->bind_param('ssi', $status_json, $comments_json, $uid);
             } elseif ($status_json && $reason !== '') {
-                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_status='needs_update', profile_field_status=?, rejection_reason=?, last_reviewed_by=?, last_reviewed_at=NOW() WHERE id=?");
-                $st->bind_param('ssii', $status_json, $reason, $me, $uid);
+                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_field_status=?, rejection_reason=? WHERE id=?");
+                $st->bind_param('ssi', $status_json, $reason, $uid);
             } elseif ($comments_json && $reason !== '') {
-                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_status='needs_update', profile_comments=?, rejection_reason=?, last_reviewed_by=?, last_reviewed_at=NOW() WHERE id=?");
-                $st->bind_param('ssii', $comments_json, $reason, $me, $uid);
+                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_comments=?, rejection_reason=? WHERE id=?");
+                $st->bind_param('ssi', $comments_json, $reason, $uid);
             } elseif ($status_json) {
-                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_status='needs_update', profile_field_status=?, last_reviewed_by=?, last_reviewed_at=NOW() WHERE id=?");
-                $st->bind_param('sii', $status_json, $me, $uid);
+                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_field_status=? WHERE id=?");
+                $st->bind_param('si', $status_json, $uid);
             } elseif ($comments_json) {
-                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_status='needs_update', profile_comments=?, last_reviewed_by=?, last_reviewed_at=NOW() WHERE id=?");
-                $st->bind_param('sii', $comments_json, $me, $uid);
+                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_comments=? WHERE id=?");
+                $st->bind_param('si', $comments_json, $uid);
             } else { // only reason
-                $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_status='needs_update', rejection_reason=?, last_reviewed_by=?, last_reviewed_at=NOW() WHERE id=?");
-                $st->bind_param('sii', $reason, $me, $uid);
+                $st = $mysqli->prepare("UPDATE users SET status='needs_update', rejection_reason=? WHERE id=?");
+                $st->bind_param('si', $reason, $uid);
             }
         } else {
-            $st = $mysqli->prepare("UPDATE users SET status='needs_update', profile_status='needs_update', last_reviewed_by=?, last_reviewed_at=NOW() WHERE id=?");
-            $st->bind_param('ii', $me, $uid);
+            $st = $mysqli->prepare("UPDATE users SET status='needs_update' WHERE id=?");
+            $st->bind_param('i', $uid);
         }
         $st->execute(); $st->close();
         $actionTaken = 'Asked user to update profile correctly';
         $user['status'] = 'needs_update';
-        $user['profile_status'] = 'needs_update';
-        $user['last_reviewed_by'] = $me;
-        $user['last_reviewed_at'] = date('Y-m-d H:i:s');
     } elseif ($act === 'promote' && $meRole === 'superadmin') {
         if (($user['role'] ?: (($user['is_admin']??0)?'admin':'user')) === 'user') {
-            $st = $mysqli->prepare("UPDATE users SET is_admin=1, role='admin', promoted_by=?, promoted_at=NOW() WHERE id=?");
-            $st->bind_param('ii', $me, $uid);
+            $st = $mysqli->prepare("UPDATE users SET is_admin=1, role='admin' WHERE id=?");
+            $st->bind_param('i', $uid);
             $st->execute(); $st->close();
             $actionTaken = 'Promoted to Admin';
-            $user['is_admin']=1; $user['role']='admin'; $user['promoted_by']=$me; $user['promoted_at']=date('Y-m-d H:i:s');
+            $user['is_admin']=1; $user['role']='admin';
         }
     } elseif ($act === 'demote' && $meRole === 'superadmin') {
         if (($user['role'] ?: (($user['is_admin']??0)?'admin':'user')) === 'admin') {
@@ -112,8 +100,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && hash_equals($csrf, $_POST['csrf'] ?
             $user['is_admin']=0; $user['role']='user';
         }
     } elseif ($act === 'deactivate') {
-        $st = $mysqli->prepare("UPDATE users SET status='rejected', last_reviewed_by=?, last_reviewed_at=NOW() WHERE id=?");
-        $st->bind_param('ii', $me, $uid);
+        $st = $mysqli->prepare("UPDATE users SET status='rejected' WHERE id=?");
+        $st->bind_param('i', $uid);
         $st->execute(); $st->close();
         $actionTaken = 'Deactivated';
         $user['status']='rejected';
@@ -221,8 +209,11 @@ include __DIR__ . '/../header.php';
           ?>
         </div>
         <div style="opacity:.85"><?= h($user['email'] ?? '') ?></div>
-        <?php if (!empty($user['promoted_by']) && !empty($user['promoter_name'])): ?>
-          <div class="note">Promoted by: <strong><?= h($user['promoter_name']) ?></strong> <?= h($user['promoted_at'] ?? '') ?></div>
+        <?php
+        // Note: promoted_by and promoter_name columns may not exist in database
+        // These features are disabled until columns are added to database
+        if (false): ?>
+          <div class="note">Promoted by: <strong><?= h($user['promoter_name'] ?? '') ?></strong> <?= h($user['promoted_at'] ?? '') ?></div>
         <?php endif; ?>
       </div>
 
@@ -352,7 +343,10 @@ include __DIR__ . '/../header.php';
           <div class="dot"></div>
           <div class="ttext">
             Last Reviewed: <strong><?= h($user['last_reviewed_at'] ?? '—') ?></strong>
-            <?php if (!empty($user['reviewer_name'])): ?>
+            <?php
+            // Note: last_reviewed_by and reviewer_name columns may not exist in database
+            // These features are disabled until columns are added to database
+            if (false && !empty($user['reviewer_name'])): ?>
               · by <strong><?= h($user['reviewer_name']) ?></strong>
             <?php endif; ?>
           </div>

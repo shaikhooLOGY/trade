@@ -101,7 +101,7 @@ if ($tab==='concerns') {
             COALESCE(c.id, 0) AS id,
             t.id AS trade_id,
             t.user_id,
-            COALESCE(c.reason,'') AS reason,
+            '' AS reason,
             COALESCE(c.created_at, t.entry_date) AS created_at,
             u.name, u.email,
             t.symbol, t.entry_date, t.exit_price,

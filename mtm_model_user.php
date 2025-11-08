@@ -51,9 +51,7 @@ if ($enrollment) {
         SELECT
             mt.*,
             COALESCE(mtp.status, 'locked') as progress_status,
-            COALESCE(mtp.attempts, 0) as attempts,
-            mtp.unlocked_at,
-            mtp.passed_at
+            COALESCE(mtp.attempts, 0) as attempts
         FROM mtm_tasks mt
         LEFT JOIN mtm_task_progress mtp ON mt.id = mtp.task_id AND mtp.enrollment_id = ?
         WHERE mt.model_id = ?

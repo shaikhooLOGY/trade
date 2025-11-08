@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
         $enrollment_id = (int)$_POST['enrollment_id'];
         $reason = trim($_POST['reason'] ?? '');
 
-        $stmt = $mysqli->prepare("UPDATE mtm_enrollments SET status = 'rejected', rejected_at = NOW() WHERE id = ?");
+        $stmt = $mysqli->prepare("UPDATE mtm_enrollments SET status = 'rejected' WHERE id = ?");
         $stmt->bind_param('i', $enrollment_id);
         $stmt->execute();
         $stmt->close();
