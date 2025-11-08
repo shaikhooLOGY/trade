@@ -1,0 +1,93 @@
+# Database INSERT Query Error - FIXED
+
+## Issue Summary
+**ERROR**: `Column count doesn't match value count at row 1`
+
+## Root Cause Analysis
+The error occurred due to a parameter count mismatch in the `bind_param()` call within the user registration flow. The INSERT statement had 10 columns but the `bind_param()` was attempting to bind 9 parameters instead of the required 7.
+
+## Exact Problem Location
+
+### register.php (line 74)
+**BEFORE (ERROR)**:
+```php
+$ins->bind_param('sssssssss',$name,$name,$email,$pass,$hash,$status,$created_at);
+```
+
+**AFTER (FIXED)**:
+```php
+$ins->bind_param('sssssss',$name,$name,$email,$pass,$hash,$status,$created_at);
+```
+
+### INSERT Statement Analysis
+The INSERT statement:
+```sql
+INSERT INTO users (name,username,email,password,password_hash,status,email_verified,verification_attempts,created_at,profile_status)
+VALUES (?,?,?,?,?,?,0,0,?, 'pending')
+```
+
+**Column Count**: 10 columns
+- name, username, email, password, password_hash, status, email_verified, verification_attempts, created_at, profile_status
+
+**Parameter Count**: 7 parameters
+- name, username, email, password, password_hash, status, created_at
+
+**Hardcoded Values**: 3 values
+- email_verified = 0
+- verification_attempts = 0  
+- profile_status = 'pending'
+
+## Additional Fix
+
+### test_password_reset.php (lines 113-114)
+Updated the test user creation to match the current table schema:
+```php
+$stmt = $this->mysqli->prepare("INSERT INTO users (name, username, email, password, password_hash, status, email_verified, verification_attempts, created_at, profile_status) VALUES (?, ?, ?, ?, ?, 'approved', 1, 0, NOW(), 'approved')");
+$stmt->bind_param('sssss', $name, $name, $email, $password_hash, $password_hash);
+```
+
+## Validation Results
+
+### Registration Test ✅
+```
+Testing: Create test user... ✅ PASS
+INSERT SUCCESS! User ID: 6
+User verification:
+- Name: Test User 1762631229
+- Email: test_1762631229@example.com  
+- Status: pending
+- Email verified: 0
+- Verification attempts: 0
+- Profile status: pending
+```
+
+### Password Reset Test ✅
+```
+🔍 PASSWORD RESET FUNCTIONALITY TEST
+Total Tests: 8
+Passed: 8
+Failed: 0
+Success Rate: 100%
+🎉 ALL TESTS PASSED!
+```
+
+## Table Schema Verification
+The `users` table currently has all required columns:
+- ✅ verification_attempts
+- ✅ otp_code  
+- ✅ otp_expires
+- ✅ status
+- ✅ email_verified
+- ✅ profile_status
+
+## Impact
+- **FIXED**: User registration now works correctly
+- **FIXED**: Password reset test functionality restored
+- **MAINTAINED**: All previous database connection fixes intact
+- **NO UI CHANGES**: Only database query corrections applied
+
+## Files Modified
+1. `/register.php` - Fixed bind_param parameter count
+2. `/test_password_reset.php` - Updated test user creation to match schema
+
+The registration flow is now fully functional and users can successfully create accounts.

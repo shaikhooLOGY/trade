@@ -1,0 +1,375 @@
+[2025-10-01 00:25:12] BEGIN sendMail -> to=shaikhoo555@gmail.com, subj="Test Email from Shaikhoology", via=mail()
+[2025-10-01 00:25:13] mail() fallback result: OK to=shaikhoo555@gmail.com
+[2025-10-01 00:30:24] FP: new-schema insert failed, trying legacy. Error=Unknown column 'token_hash' in 'INSERT INTO'
+[2025-10-01 00:30:24] FP: token created for user_id=11, email=Asimwalton@gmail.com, expires_at=2025-10-01 01:30:24, inserted=1
+[2025-10-01 00:30:24] BEGIN sendMail -> to=Asimwalton@gmail.com, subj="Reset your password — Shaikhoology", via=mail()
+[2025-10-01 00:30:25] mail() fallback result: OK to=Asimwalton@gmail.com
+[2025-10-01 00:30:25] FP: mail send to Asimwalton@gmail.com: OK link=https://tradersclub.shaikhoology.com/reset_password.php?token=15d9015be544758a6a7eae543037b88b2ecdb984ed7f1ba20e8de99013effbc3
+[2025-10-01 01:25:28] BEGIN sendMail -> to=shaikhoo555@gmail.com, subj="Reset your password — Shaikhoology", via=mail()
+[2025-10-01 01:25:28] mail() fallback result: OK to=shaikhoo555@gmail.com
+[2025-10-01 01:40:01] BEGIN sendMail -> to=shaikhoo555@gmail.com, subj="Reset your password — Shaikhoology", via=mail()
+[2025-10-01 01:40:02] mail() fallback result: OK to=shaikhoo555@gmail.com
+[2025-10-01 01:43:38] BEGIN sendMail -> to=asim@gmail.com, subj="Reset your password — Shaikhoology", via=mail()
+[2025-10-01 01:43:38] mail() fallback result: OK to=asim@gmail.com
+[2025-10-01 03:13:44] BEGIN sendMail -> to=asimwalton1@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-01 03:13:44] mail() fallback result: OK to=asimwalton1@gmail.com
+[2025-10-01 03:18:37] BEGIN sendMail -> to=asimwalton1@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-01 03:18:37] mail() fallback result: OK to=asimwalton1@gmail.com
+[2025-10-01 03:23:57] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COM, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-01 03:23:57] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COM
+[2025-10-01 03:43:22] BEGIN sendMail -> to=SDF@WF.CO, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-01 03:43:22] mail() fallback result: OK to=SDF@WF.CO
+[2025-10-01 03:44:33] BEGIN sendMail -> to=EVF@WF.VMOV, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-01 03:44:33] mail() fallback result: OK to=EVF@WF.VMOV
+[2025-10-01 04:09:51] BEGIN sendMail -> to=qwdq@sfs.vd, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-01 04:09:51] mail() fallback result: OK to=qwdq@sfs.vd
+[2025-10-01 04:12:51] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COm, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-01 04:12:51] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COm
+[2025-10-01 04:13:59] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COm, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-01 04:13:59] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COm
+[2025-10-01 04:14:22] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COm, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-01 04:14:22] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COm
+[2025-10-01 04:22:26] BEGIN sendMail -> to=wfw@dfw.ve, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-01 04:22:26] mail() fallback result: OK to=wfw@dfw.ve
+[2025-10-02 01:29:02] BEGIN sendMail -> to=new@new.new, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-02 01:29:02] mail() fallback result: OK to=new@new.new
+[2025-10-02 01:29:27] BEGIN sendMail -> to=new@new.new, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-02 01:29:27] mail() fallback result: OK to=new@new.new
+[2025-10-02 02:32:12] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COM, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-02 02:32:12] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COM
+[2025-10-02 03:38:22] BEGIN sendMail -> to=help@shaikhoology.com, subj="New User Awaiting Approval: Wasim Shaikh", via=mail()
+[2025-10-02 03:38:22] mail() fallback result: OK to=help@shaikhoology.com
+[2025-10-02 07:18:12] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COM, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-02 07:18:12] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COM
+[2025-10-02 07:47:41] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COM, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-02 07:47:41] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COM
+[2025-10-02 08:13:35] BEGIN sendMail -> to=shaikhoology@gmail.com, subj="Test Subject", via=mail()
+[2025-10-02 08:13:35] mail() fallback result: OK to=shaikhoology@gmail.com
+[2025-10-02 08:38:55] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COM, subj="Reset your password — Shaikhoology", via=mail()
+[2025-10-02 08:38:55] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COM
+[2025-10-02 19:06:09] BEGIN sendMail -> to=shaikhoo555@gmail.com, subj="Reset your password — Shaikhoology", via=mail()
+[2025-10-02 19:06:09] mail() fallback result: OK to=shaikhoo555@gmail.com
+[2025-10-02 22:55:27] BEGIN sendMail -> to=Shaikhoologymeetings@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-02 22:55:27] mail() fallback result: OK to=Shaikhoologymeetings@gmail.com
+[2025-10-02 22:55:56] BEGIN sendMail -> to=Shaikhoologymeetings@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-02 22:55:57] mail() fallback result: OK to=Shaikhoologymeetings@gmail.com
+[2025-10-02 23:41:13] BEGIN sendMail -> to=asimwalton1@gmail.com, subj="🎉 Account Approved — Welcome!", via=mail()
+[2025-10-02 23:41:14] mail() fallback result: OK to=asimwalton1@gmail.com
+[2025-10-02 23:43:21] BEGIN sendMail -> to=new@new.new, subj="🎉 Account Approved — Welcome!", via=mail()
+[2025-10-02 23:43:21] mail() fallback result: OK to=new@new.new
+[2025-10-02 23:48:02] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COM, subj="🎉 Account Approved — Welcome!", via=mail()
+[2025-10-02 23:48:02] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COM
+[2025-10-02 23:53:44] BEGIN sendMail -> to=wfw@dfw.ve, subj="🎉 Account Approved — Welcome!", via=mail()
+[2025-10-02 23:53:45] mail() fallback result: OK to=wfw@dfw.ve
+[2025-10-03 02:48:05] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COM, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-03 02:48:05] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COM
+[2025-10-03 11:40:08] BEGIN sendMail -> to=skzkr88@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-03 11:40:08] mail() fallback result: OK to=skzkr88@gmail.com
+[2025-10-03 20:03:59] BEGIN sendMail -> to=sofiyanbagwan20@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-03 20:04:00] mail() fallback result: OK to=sofiyanbagwan20@gmail.com
+[2025-10-04 16:58:51] BEGIN sendMail -> to=sofiyanbagwan20@gmail.com, subj="Reset your password — Shaikhoology", via=mail()
+[2025-10-04 16:58:52] mail() fallback result: OK to=sofiyanbagwan20@gmail.com
+[2025-10-04 19:33:56] BEGIN sendMail -> to=musaibanwaar@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-04 19:33:56] mail() fallback result: OK to=musaibanwaar@gmail.com
+[2025-10-06 00:15:41] BEGIN sendMail -> to=amiryusuf015@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-06 00:15:42] mail() fallback result: OK to=amiryusuf015@gmail.com
+[2025-10-06 11:42:01] BEGIN sendMail -> to=faiz313999@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-06 11:42:01] mail() fallback result: OK to=faiz313999@gmail.com
+[2025-10-07 00:31:48] BEGIN sendMail -> to=shaikhanyime@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-07 00:31:48] mail() fallback result: OK to=shaikhanyime@gmail.com
+[2025-10-07 06:41:09] BEGIN sendMail -> to=SHAIKHOOLOGY@GMAIL.COM, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-07 06:41:10] mail() fallback result: OK to=SHAIKHOOLOGY@GMAIL.COM
+[2025-10-07 23:48:23] BEGIN sendMail -> to=shaikhanyime@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-07 23:48:23] mail() fallback result: OK to=shaikhanyime@gmail.com
+[2025-10-07 23:50:32] BEGIN sendMail -> to=shaikhanyime@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-07 23:50:33] mail() fallback result: OK to=shaikhanyime@gmail.com
+[2025-10-07 23:53:00] BEGIN sendMail -> to=shaikhanytime@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-07 23:53:00] mail() fallback result: OK to=shaikhanytime@gmail.com
+[2025-10-11 12:58:01] BEGIN sendMail -> to=khan4004@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-11 12:58:01] mail() fallback result: OK to=khan4004@gmail.com
+[2025-10-22 11:32:38] BEGIN sendMail -> to=ANISDAUVA31@GMAIL.COM, subj="Your Shaikhoology verification code", via=mail()
+[2025-10-22 11:32:38] mail() fallback result: OK to=ANISDAUVA31@GMAIL.COM
+[2025-11-08 23:43:05] BEGIN sendMail -> to=shaikhoo555@gmail.com, subj="Reset your password — Shaikhoology", via=mail()
+[2025-11-08 23:43:05] mail() fallback result: OK to=shaikhoo555@gmail.com
+[2025-11-08 23:48:46] BEGIN sendMail -> to=testuser3@example.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-11-08 23:48:46] mail() fallback result: OK to=testuser3@example.com
+[2025-11-08 23:54:09] BEGIN sendMail -> to=shaikhoo555@gmail.com, subj="Reset your password — Shaikhoology", via=mail()
+[2025-11-08 23:54:09] mail() fallback result: OK to=shaikhoo555@gmail.com
+[2025-11-08 23:54:56] BEGIN sendMail -> to=Shaikhoologymeetings@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-11-08 23:54:56] mail() fallback result: OK to=Shaikhoologymeetings@gmail.com
+[2025-11-08 23:56:54] BEGIN sendMail -> to=Shaikhoologymeetings@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-11-08 23:56:54] mail() fallback result: OK to=Shaikhoologymeetings@gmail.com
+[2025-11-09 00:00:52] BEGIN sendMail -> to=test@example.com, subj="Test Email from Local Development", via=mail()
+[2025-11-09 00:00:52] DEV email logged to: /Users/shaikhoology/Desktop/LIVE TC/logs/dev_emails.log -> to=test@example.com
+[2025-11-09 00:02:14] BEGIN sendMail -> to=Shaikhoologymeetings@gmail.com, subj="Your Shaikhoology verification code", via=mail()
+[2025-11-09 00:02:14] DEV email logged to: /Users/shaikhoology/Desktop/LIVE TC/logs/dev_emails.log -> to=Shaikhoologymeetings@gmail.com
+[2025-11-09 00:02:14] DEV OTP extracted and stored: 256052
+[2025-11-09 00:04:39] BEGIN sendMail -> to=shaikhoo555@gmail.com, subj="Reset your password — Shaikhoology", via=mail()
+[2025-11-09 00:04:39] mail() fallback result: OK to=shaikhoo555@gmail.com
+[2025-11-09 00:11:06] BEGIN sendMail -> to=test@example.com, subj="Shaikhoology - Production Email System Test", via=SMTP
+[2025-11-09 00:11:07] SMTP Debug [L2]: SERVER -> CLIENT: 220 ESMTP smtp.hostinger.com
+[2025-11-09 00:11:07] SMTP Debug [L1]: CLIENT -> SERVER: EHLO Wasims-MacBook-Air.local
+[2025-11-09 00:11:07] SMTP Debug [L2]: SERVER -> CLIENT: 250-smtp.hostinger.com
+250-PIPELINING
+250-SIZE 48811212
+250-ETRN
+250-STARTTLS
+250-AUTH PLAIN LOGIN
+250-ENHANCEDSTATUSCODES
+250-8BITMIME
+250-DSN
+250 CHUNKING
+[2025-11-09 00:11:07] SMTP Debug [L1]: CLIENT -> SERVER: STARTTLS
+[2025-11-09 00:11:07] SMTP Debug [L2]: SERVER -> CLIENT: 220 2.0.0 Ready to start TLS
+[2025-11-09 00:11:07] SMTP Debug [L1]: CLIENT -> SERVER: EHLO Wasims-MacBook-Air.local
+[2025-11-09 00:11:09] SMTP Debug [L2]: SERVER -> CLIENT: 250-smtp.hostinger.com
+250-PIPELINING
+250-SIZE 48811212
+250-ETRN
+250-AUTH PLAIN LOGIN
+250-ENHANCEDSTATUSCODES
+250-8BITMIME
+250-DSN
+250 CHUNKING
+[2025-11-09 00:11:09] SMTP Debug [L1]: CLIENT -> SERVER: AUTH LOGIN
+[2025-11-09 00:11:09] SMTP Debug [L2]: SERVER -> CLIENT: 334 VXNlcm5hbWU6
+[2025-11-09 00:11:09] SMTP Debug [L1]: CLIENT -> SERVER: [credentials hidden]
+[2025-11-09 00:11:09] SMTP Debug [L2]: SERVER -> CLIENT: 334 UGFzc3dvcmQ6
+[2025-11-09 00:11:09] SMTP Debug [L1]: CLIENT -> SERVER: [credentials hidden]
+[2025-11-09 00:11:10] SMTP Debug [L2]: SERVER -> CLIENT: 235 2.7.0 Authentication successful
+[2025-11-09 00:11:10] SMTP Debug [L1]: CLIENT -> SERVER: MAIL FROM:<help@shaikhoology.com>
+[2025-11-09 00:11:10] SMTP Debug [L2]: SERVER -> CLIENT: 250 2.1.0 Ok
+[2025-11-09 00:11:10] SMTP Debug [L1]: CLIENT -> SERVER: RCPT TO:<test@example.com>
+[2025-11-09 00:11:10] SMTP Debug [L2]: SERVER -> CLIENT: 250 2.1.5 Ok
+[2025-11-09 00:11:10] SMTP Debug [L1]: CLIENT -> SERVER: DATA
+[2025-11-09 00:11:11] SMTP Debug [L2]: SERVER -> CLIENT: 354 End data with <CR><LF>.<CR><LF>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Date: Sun, 9 Nov 2025 00:11:06 +0530
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: To: test@example.com
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: From: =?UTF-8?Q?Shaikhoology_=E2=80=94_Trading_Psychology?= <help@shaikhoology.com>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Reply-To: =?UTF-8?Q?Shaikhoology_=E2=80=94_Trading_Psychology?= <help@shaikhoology.com>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Subject: Shaikhoology - Production Email System Test
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Message-ID: <nAVHDPiJazS9tBciRKy15l0dWaopdV3m2nhTk4I9I@Wasims-MacBook-Air.local>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: X-Mailer: Shaikhoology Email System
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: MIME-Version: 1.0
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Content-Type: multipart/alternative;
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:  boundary="b1=_nAVHDPiJazS9tBciRKy15l0dWaopdV3m2nhTk4I9I"
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Content-Transfer-Encoding: 8bit
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: --b1=_nAVHDPiJazS9tBciRKy15l0dWaopdV3m2nhTk4I9I
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Content-Type: text/plain; charset=us-ascii
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Shaikhoology Trading Psychology - Production Email System Test
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Email System Configuration Successful!
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: This is a test email to verify that your production email system is working correctly.
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Test Verification Code: 874705
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Generated at: 2025-11-09 00:11:06
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: System Information:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: - SMTP Host: smtp.hostinger.com
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: - Port: 587
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: - Authentication: Enabled
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: - Environment: prod
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: If you received this email, your production email system is working correctly!
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Shaikhoology Trading Psychology System
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Professional Email Delivery - Production Ready
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: --b1=_nAVHDPiJazS9tBciRKy15l0dWaopdV3m2nhTk4I9I
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Content-Type: text/html; charset=UTF-8
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: Content-Transfer-Encoding: 8bit
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: <!DOCTYPE html>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: <html lang="en">
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: <head>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     <meta charset="UTF-8">
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     <title>Production Email Test</title>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     <style>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         .verification-code { background: #fff; border: 2px solid #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         .code { font-size: 28px; font-weight: bold; color: #667eea; letter-spacing: 3px; }
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         .footer { text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px; }
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     </style>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: </head>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: <body>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     <div class="header">
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         <h1>🧠 Shaikhoology Trading Psychology</h1>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         <p>Production Email System Test</p>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     </div>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     <div class="content">
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         <h2>Email System Configuration Successful!</h2>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         <p>This is a test email to verify that your production email system is working correctly.</p>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         <div class="verification-code">
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:             <p>Test Verification Code:</p>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:             <div class="code">874705</div>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:             <p><small>Generated at: 2025-11-09 00:11:06</small></p>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         </div>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         <p><strong>System Information:</strong></p>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         <ul>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:             <li>SMTP Host: smtp.hostinger.com</li>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:             <li>Port: 587</li>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:             <li>Authentication: Enabled</li>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:             <li>Environment: prod</li>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         </ul>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         <p>If you received this email, your production email system is working correctly!</p>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     </div>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     <div class="footer">
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         <p>Shaikhoology Trading Psychology System<br>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:         Professional Email Delivery - Production Ready</p>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:     </div>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: </body>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: </html>
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: --b1=_nAVHDPiJazS9tBciRKy15l0dWaopdV3m2nhTk4I9I--
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: .
+[2025-11-09 00:11:11] SMTP Debug [L2]: SERVER -> CLIENT: 250 2.0.0 Ok: queued as 4d3lBG3m5Bz3wgn
+[2025-11-09 00:11:11] SMTP Debug [L1]: CLIENT -> SERVER: QUIT
+[2025-11-09 00:11:11] SMTP Debug [L2]: SERVER -> CLIENT: 221 2.0.0 Bye
+[2025-11-09 00:12:22] BEGIN sendMail -> to=test@example.com, subj="Shaikhoology - Production Email System Test", via=SMTP
+[2025-11-09 00:12:22] SMTP Debug [L2]: SERVER -> CLIENT: 220 ESMTP smtp.hostinger.com
+[2025-11-09 00:12:22] SMTP Debug [L1]: CLIENT -> SERVER: EHLO Wasims-MacBook-Air.local
+[2025-11-09 00:12:22] SMTP Debug [L2]: SERVER -> CLIENT: 250-smtp.hostinger.com
+250-PIPELINING
+250-SIZE 48811212
+250-ETRN
+250-STARTTLS
+250-AUTH PLAIN LOGIN
+250-ENHANCEDSTATUSCODES
+250-8BITMIME
+250-DSN
+250 CHUNKING
+[2025-11-09 00:12:22] SMTP Debug [L1]: CLIENT -> SERVER: STARTTLS
+[2025-11-09 00:12:23] SMTP Debug [L2]: SERVER -> CLIENT: 220 2.0.0 Ready to start TLS
+[2025-11-09 00:12:23] SMTP Debug [L1]: CLIENT -> SERVER: EHLO Wasims-MacBook-Air.local
+[2025-11-09 00:12:23] SMTP Debug [L2]: SERVER -> CLIENT: 250-smtp.hostinger.com
+250-PIPELINING
+250-SIZE 48811212
+250-ETRN
+250-AUTH PLAIN LOGIN
+250-ENHANCEDSTATUSCODES
+250-8BITMIME
+250-DSN
+250 CHUNKING
+[2025-11-09 00:12:23] SMTP Debug [L1]: CLIENT -> SERVER: AUTH LOGIN
+[2025-11-09 00:12:24] SMTP Debug [L2]: SERVER -> CLIENT: 334 VXNlcm5hbWU6
+[2025-11-09 00:12:24] SMTP Debug [L1]: CLIENT -> SERVER: [credentials hidden]
+[2025-11-09 00:12:24] SMTP Debug [L2]: SERVER -> CLIENT: 334 UGFzc3dvcmQ6
+[2025-11-09 00:12:24] SMTP Debug [L1]: CLIENT -> SERVER: [credentials hidden]
+[2025-11-09 00:12:24] SMTP Debug [L2]: SERVER -> CLIENT: 235 2.7.0 Authentication successful
+[2025-11-09 00:12:24] SMTP Debug [L1]: CLIENT -> SERVER: MAIL FROM:<help@shaikhoology.com>
+[2025-11-09 00:12:24] SMTP Debug [L2]: SERVER -> CLIENT: 250 2.1.0 Ok
+[2025-11-09 00:12:24] SMTP Debug [L1]: CLIENT -> SERVER: RCPT TO:<test@example.com>
+[2025-11-09 00:12:24] SMTP Debug [L2]: SERVER -> CLIENT: 250 2.1.5 Ok
+[2025-11-09 00:12:24] SMTP Debug [L1]: CLIENT -> SERVER: DATA
+[2025-11-09 00:12:25] SMTP Debug [L2]: SERVER -> CLIENT: 354 End data with <CR><LF>.<CR><LF>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Date: Sun, 9 Nov 2025 00:12:22 +0530
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: To: test@example.com
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: From: =?UTF-8?Q?Shaikhoology_=E2=80=94_Trading_Psychology?= <help@shaikhoology.com>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Reply-To: =?UTF-8?Q?Shaikhoology_=E2=80=94_Trading_Psychology?= <help@shaikhoology.com>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Subject: Shaikhoology - Production Email System Test
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Message-ID: <L9Xv4tj0kaFhYIxi2ExoA7XrkK29JwVELBD7pjm8M64@Wasims-MacBook-Air.local>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: X-Mailer: Shaikhoology Email System
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: MIME-Version: 1.0
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Content-Type: multipart/alternative;
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:  boundary="b1=_L9Xv4tj0kaFhYIxi2ExoA7XrkK29JwVELBD7pjm8M64"
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Content-Transfer-Encoding: 8bit
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: --b1=_L9Xv4tj0kaFhYIxi2ExoA7XrkK29JwVELBD7pjm8M64
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Content-Type: text/plain; charset=us-ascii
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Shaikhoology Trading Psychology - Production Email System Test
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Email System Configuration Successful!
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: This is a test email to verify that your production email system is working correctly.
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Test Verification Code: 987982
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Generated at: 2025-11-09 00:12:22
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: System Information:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: - SMTP Host: smtp.hostinger.com
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: - Port: 587
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: - Authentication: Enabled
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: - Environment: prod
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: If you received this email, your production email system is working correctly!
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Shaikhoology Trading Psychology System
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Professional Email Delivery - Production Ready
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: --b1=_L9Xv4tj0kaFhYIxi2ExoA7XrkK29JwVELBD7pjm8M64
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Content-Type: text/html; charset=UTF-8
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: Content-Transfer-Encoding: 8bit
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: <!DOCTYPE html>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: <html lang="en">
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: <head>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     <meta charset="UTF-8">
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     <title>Production Email Test</title>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     <style>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px 10px 0 0; text-align: center; }
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         .content { background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         .verification-code { background: #fff; border: 2px solid #667eea; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0; }
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         .code { font-size: 28px; font-weight: bold; color: #667eea; letter-spacing: 3px; }
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         .footer { text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #dee2e6; color: #6c757d; font-size: 14px; }
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     </style>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: </head>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: <body>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     <div class="header">
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         <h1>🧠 Shaikhoology Trading Psychology</h1>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         <p>Production Email System Test</p>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     </div>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     <div class="content">
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         <h2>Email System Configuration Successful!</h2>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         <p>This is a test email to verify that your production email system is working correctly.</p>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         <div class="verification-code">
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:             <p>Test Verification Code:</p>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:             <div class="code">987982</div>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:             <p><small>Generated at: 2025-11-09 00:12:22</small></p>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         </div>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         <p><strong>System Information:</strong></p>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         <ul>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:             <li>SMTP Host: smtp.hostinger.com</li>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:             <li>Port: 587</li>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:             <li>Authentication: Enabled</li>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:             <li>Environment: prod</li>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         </ul>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         <p>If you received this email, your production email system is working correctly!</p>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     </div>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     <div class="footer">
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         <p>Shaikhoology Trading Psychology System<br>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:         Professional Email Delivery - Production Ready</p>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:     </div>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: </body>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: </html>
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: --b1=_L9Xv4tj0kaFhYIxi2ExoA7XrkK29JwVELBD7pjm8M64--
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER:
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: .
+[2025-11-09 00:12:25] SMTP Debug [L2]: SERVER -> CLIENT: 250 2.0.0 Ok: queued as 4d3lCh697xz2yMj
+[2025-11-09 00:12:25] SMTP Debug [L1]: CLIENT -> SERVER: QUIT
+[2025-11-09 00:12:25] SMTP Debug [L2]: SERVER -> CLIENT: 221 2.0.0 Bye
+[2025-11-09 00:12:25] SMTP send SUCCESS: to=test@example.com subject="Shaikhoology - Production Email System Test" host=smtp.hostinger.com user=help@shaikhoology.com error=
+[2025-11-09 00:26:53] BEGIN sendMail -> to=shaikhoo555@gmail.com, subj="Reset your password — Shaikhoology", via=SMTP
+[2025-11-09 00:26:57] SMTP send SUCCESS: to=shaikhoo555@gmail.com subject="Reset your password — Shaikhoology" host=smtp.hostinger.com user=help@shaikhoology.com error=

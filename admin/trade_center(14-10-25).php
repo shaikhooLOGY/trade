@@ -1,0 +1,396 @@
+<?php
+// admin/trade_center.php — v4.5 (stable) — synced with dashboard v3.6.3
+require_once __DIR__ . '/../config.php';
+if (session_status() === PHP_SESSION_NONE) session_start();
+if (empty($_SESSION['is_admin'])) { header('HTTP/1.1 403 Forbidden'); exit('Admins only'); }
+
+function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
+function t($s){ return trim((string)$s); }
+function csrf_token(){ if (empty($_SESSION['csrf'])) $_SESSION['csrf']=bin2hex(random_bytes(32)); return $_SESSION['csrf']; }
+function csrf_ok($x){ return isset($_SESSION['csrf']) && hash_equals($_SESSION['csrf'], (string)$x); }
+function flash($m=null){ if($m!==null){ $_SESSION['flash']=$m; } else { $m=$_SESSION['flash']??''; unset($_SESSION['flash']); return $m; } }
+
+$VERSION='v4.5';
+if (!empty($_GET['flush']) && function_exists('opcache_reset')) @opcache_reset();
+
+/* ---------------- POST actions ---------------- */
+if ($_SERVER['REQUEST_METHOD']==='POST' && csrf_ok($_POST['csrf'] ?? '')) {
+  $act   = $_POST['action'] ?? '';
+  $cid   = (int)($_POST['id'] ?? 0);
+  $tid   = (int)($_POST['trade_id'] ?? 0);
+  $admin = (int)($_SESSION['user_id'] ?? 0);
+  $reason= t($_POST['reason'] ?? '');
+  $redir = $_POST['redir'] ?? 'trade_center.php';
+
+  switch ($act) {
+    case 'approve_concern':
+      if ($cid>0) {
+        // mark concern + reopen trade for edit
+        $mysqli->query("UPDATE trade_concerns SET resolved='yes', resolved_at=NOW(), resolved_by={$admin} WHERE id={$cid}");
+        $mysqli->query("UPDATE trades t JOIN trade_concerns c ON t.id=c.trade_id
+                        SET t.unlock_status='approved', t.exit_price=NULL, t.outcome='OPEN'
+                        WHERE c.id={$cid}");
+        flash('Approved → trade reopened for user (unlock granted).');
+      }
+      break;
+
+    case 'reject_concern':
+      if ($cid>0) {
+        $mysqli->query("UPDATE trade_concerns SET resolved='yes', resolved_at=NOW(), resolved_by={$admin} WHERE id={$cid}");
+        $mysqli->query("UPDATE trades t JOIN trade_concerns c ON t.id=c.trade_id SET t.unlock_status='rejected' WHERE c.id={$cid}");
+        flash('Rejected → trade remains locked.');
+      }
+      break;
+
+    case 'resolve_concern':
+      if ($cid>0) {
+        $mysqli->query("UPDATE trade_concerns SET resolved='yes', resolved_at=NOW(), resolved_by={$admin} WHERE id={$cid}");
+        flash('Concern marked resolved.');
+      }
+      break;
+
+    case 'force_unlock': // also reopen
+      if ($tid>0) {
+        $mysqli->query("UPDATE trades SET unlock_status='approved', exit_price=NULL, outcome='OPEN' WHERE id={$tid}");
+        flash('Trade unlocked & reopened.');
+      }
+      break;
+
+    case 'force_lock':
+      if ($tid>0) {
+        $mysqli->query("UPDATE trades SET unlock_status='rejected' WHERE id={$tid}");
+        flash('Trade locked.');
+      }
+      break;
+
+    case 'soft_delete':
+      if ($tid>0) {
+        $stmt=$mysqli->prepare("UPDATE trades SET deleted_at=NOW(), deleted_by=?, deleted_by_admin=1, deleted_reason=? WHERE id=?");
+        $stmt->bind_param('isi',$admin,$reason,$tid); $stmt->execute(); $stmt->close();
+        flash('Trade soft-deleted.');
+      }
+      break;
+
+    case 'restore':
+      if ($tid>0) {
+        $mysqli->query("UPDATE trades SET deleted_at=NULL, deleted_by=NULL, deleted_by_admin=0, deleted_reason=NULL WHERE id={$tid}");
+        flash('Trade restored.');
+      }
+      break;
+  }
+  header("Location: {$redir}"); exit;
+}
+
+/* ---------------- Tabs & queries ---------------- */
+$tab = strtolower($_GET['tab'] ?? 'concerns');
+if (!in_array($tab,['concerns','user_trades','deleted'],true)) $tab='concerns';
+$flash = flash();
+
+/* ===== Concerns (closed + pending) ===== */
+if ($tab==='concerns') {
+  $status = strtolower($_GET['status'] ?? 'pending'); // pending|approved|rejected|all
+  if (!in_array($status,['pending','approved','rejected','all'],true)) $status='pending';
+
+  if ($status==='pending') {
+    // Only closed trades, unlock pending (actions visible)
+    $where = "LOWER(t.unlock_status)='pending' AND UPPER(COALESCE(t.outcome,''))<>'OPEN'";
+  } elseif ($status==='approved') {
+    $where = "LOWER(t.unlock_status)='approved'";
+  } elseif ($status==='rejected') {
+    $where = "LOWER(t.unlock_status)='rejected'";
+  } else {
+    $where = "1";
+  }
+
+  $sql = "SELECT
+            COALESCE(c.id, 0) AS id,
+            t.id AS trade_id,
+            t.user_id,
+            COALESCE(c.reason,'') AS reason,
+            COALESCE(c.created_at, t.entry_date) AS created_at,
+            COALESCE(c.resolved,'') AS resolved,
+            u.name, u.email,
+            t.symbol, t.entry_date, t.exit_price,
+            COALESCE(t.outcome,'') AS outcome,
+            COALESCE(t.unlock_status,'none') AS unlock_status
+          FROM trades t
+          LEFT JOIN trade_concerns c
+            ON c.trade_id=t.id
+           AND (c.resolved='' OR c.resolved IS NULL)
+          LEFT JOIN users u ON u.id=t.user_id
+          WHERE {$where}
+          ORDER BY created_at DESC";
+  $concerns = ($r=$mysqli->query($sql)) ? $r->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/* ===== User-wise trades ===== */
+if ($tab==='user_trades') {
+  $users=[]; $ru=$mysqli->query("SELECT id, COALESCE(name,email) label FROM users ORDER BY name IS NULL, name, email");
+  if ($ru) while($x=$ru->fetch_assoc()) $users[]=$x;
+
+  $uid   = (int)($_GET['user_id'] ?? 0);
+  $state = strtolower($_GET['status'] ?? 'all'); // all|open|closed|unlocked|locked|deleted|required_unlock
+  if (!in_array($state,['all','open','closed','unlocked','locked','deleted','required_unlock'],true)) $state='all';
+
+  $where = ($uid>0) ? "t.user_id={$uid}" : "1";
+  if ($state==='open')   $where .= " AND UPPER(COALESCE(t.outcome,'OPEN'))='OPEN' AND t.deleted_at IS NULL";
+  if ($state==='closed') $where .= " AND UPPER(COALESCE(t.outcome,''))<>'OPEN' AND t.deleted_at IS NULL";
+  if ($state==='unlocked') $where .= " AND LOWER(t.unlock_status)='approved' AND t.deleted_at IS NULL";
+  if ($state==='locked')   $where .= " AND LOWER(COALESCE(t.unlock_status,'none')) IN ('none','rejected') AND UPPER(COALESCE(t.outcome,''))<>'OPEN' AND t.deleted_at IS NULL";
+  if ($state==='deleted')  $where .= " AND t.deleted_at IS NOT NULL";
+  if ($state==='required_unlock') $where .= " AND UPPER(COALESCE(t.outcome,''))<>'OPEN' AND LOWER(COALESCE(t.unlock_status,'none')) NOT IN ('approved','rejected') AND t.deleted_at IS NULL";
+
+  $sqlU = "SELECT t.id,t.user_id,COALESCE(t.symbol,'') symbol,t.entry_date,t.exit_price,
+                  COALESCE(t.outcome,'') outcome, COALESCE(t.pl_percent,0) pl_percent,
+                  COALESCE(t.unlock_status,'none') unlock_status,
+                  t.deleted_at, t.deleted_by_admin, t.deleted_reason,
+                  u.name, u.email
+           FROM trades t
+           LEFT JOIN users u ON u.id=t.user_id
+           WHERE {$where}
+           ORDER BY t.id DESC
+           LIMIT 1000";
+  $trades = ($ru2=$mysqli->query($sqlU)) ? $ru2->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+/* ===== Deleted ===== */
+if ($tab==='deleted') {
+  $sqlD = "SELECT t.id, t.user_id, COALESCE(u.name,u.email) user_name,
+                  COALESCE(t.symbol,'') symbol, t.entry_date, t.deleted_at,
+                  t.deleted_by_admin, t.deleted_reason
+           FROM trades t
+           LEFT JOIN users u ON u.id=t.user_id
+           WHERE t.deleted_at IS NOT NULL
+           ORDER BY t.deleted_at DESC";
+  $deleted = ($rd=$mysqli->query($sqlD)) ? $rd->fetch_all(MYSQLI_ASSOC) : [];
+}
+
+$title="Admin • Trade Center {$VERSION}";
+include __DIR__ . '/../header.php';
+?>
+<div style="max-width:1200px;margin:22px auto;padding:0 16px">
+  <?php if($flash): ?>
+    <div style="background:#ecfdf5;border:1px solid #10b98133;padding:10px;margin-bottom:12px;border-radius:10px;color:#065f46;font-weight:700"><?=h($flash)?></div>
+  <?php endif; ?>
+
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <?php
+      $tabs=['concerns'=>'Trade Concerns','user_trades'=>'User-wise Trades','deleted'=>'Deleted Trades'];
+    foreach($tabs as $k=>$v){
+      $active = ($tab===$k) ? 'background:#5a2bd9;color:#fff;font-weight:800;border-color:transparent' : '';
+      echo '<a href="?tab='.$k.'" style="padding:8px 12px;border-radius:999px;border:1px solid #e5e7eb;text-decoration:none;'.$active.'">'.$v.'</a>';
+    } ?>
+    <div style="margin-left:auto;opacity:.6;font-size:12px">Build: <?=$VERSION?> · <a href="?tab=<?=$tab?>&flush=1" style="color:#5a2bd9">flush</a></div>
+  </div>
+
+  <?php if($tab==='concerns'):
+    $v = strtolower($_GET['status'] ?? 'pending'); ?>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <?php foreach(['pending','approved','rejected','all'] as $s): ?>
+        <a href="?tab=concerns&status=<?=$s?>" style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:999px;text-decoration:none;<?=($v==$s?'background:#5a2bd9;color:#fff;font-weight:800;border-color:transparent':'')?>"><?=ucfirst($s)?></a>
+      <?php endforeach;?>
+    </div>
+
+    <div style="overflow:auto;background:#fff;border-radius:12px;box-shadow:0 10px 28px rgba(16,24,40,.08)">
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead><tr style="background:#f8fafc">
+          <th style="padding:10px;text-align:left">#</th>
+          <th style="padding:10px;text-align:left">User</th>
+          <th style="padding:10px;text-align:left">Trade</th>
+          <th style="padding:10px;text-align:left">Reason</th>
+          <th style="padding:10px;text-align:left">Raised</th>
+          <th style="padding:10px;text-align:left">Status</th>
+          <th style="padding:10px;text-align:left">Actions</th>
+        </tr></thead>
+        <tbody>
+        <?php if(empty($concerns)): ?>
+          <tr><td colspan="7" style="padding:12px;color:#666">No matching concerns.</td></tr>
+        <?php else: foreach($concerns as $c):
+          $decision = strtolower(t($c['unlock_status'] ?? 'none'));
+          $isOpen   = (strtoupper(t($c['outcome']))==='OPEN');
+          if     ($decision==='approved') { $status='APPROVED'; $col='#10b981'; }
+          elseif ($decision==='rejected') { $status='REJECTED'; $col='#ef4444'; }
+          elseif ($decision==='pending')  { $status='PENDING';  $col='#f59e0b'; }
+          else                            { $status = $isOpen ? 'OPEN' : '—'; $col='#64748b'; }
+        ?>
+          <tr style="border-top:1px solid #eef2f7">
+            <td style="padding:10px"><?= (int)$c['id']?></td>
+            <td style="padding:10px"><?=h($c['name'] ?: $c['email'])?></td>
+            <td style="padding:10px">
+              <a href="/trade_view.php?id=<?=$c['trade_id']?>" style="text-decoration:none;color:#5a2bd9;font-weight:700"><?=h($c['symbol'])?></a><br>
+              <small style="color:#64748b">Entry: <?=h($c['entry_date'])?> • Exit: <?=h($c['exit_price'])?></small>
+            </td>
+            <td style="padding:10px"><?=nl2br(h($c['reason']))?></td>
+            <td style="padding:10px"><?=h($c['created_at'])?></td>
+            <td style="padding:10px;font-weight:800;color:<?=$col?>"><?=$status?></td>
+            <td style="padding:10px;white-space:nowrap">
+              <?php if ($isOpen): ?>
+                <span style="opacity:.6">Open trade — no action.</span>
+              <?php elseif ($decision==='approved' || $decision==='rejected'): ?>
+                <span style="background:#ecfdf5;color:#065f46;padding:6px 10px;border-radius:6px;font-weight:700">✅ Resolved</span>
+              <?php else: ?>
+                <form method="post" style="display:inline">
+                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="id" value="<?=$c['id']?>">
+                  <input type="hidden" name="redir" value="trade_center.php?tab=concerns&status=<?=$v?>">
+                  <button name="action" value="approve_concern" style="background:#10b981;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Approve</button>
+                </form>
+                <form method="post" style="display:inline;margin-left:6px">
+                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="id" value="<?=$c['id']?>">
+                  <input type="hidden" name="redir" value="trade_center.php?tab=concerns&status=<?=$v?>">
+                  <button name="action" value="reject_concern" style="background:#ef4444;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Reject</button>
+                </form>
+                <form method="post" style="display:inline;margin-left:6px">
+                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="id" value="<?=$c['id']?>">
+                  <input type="hidden" name="redir" value="trade_center.php?tab=concerns&status=<?=$v?>">
+                  <button name="action" value="resolve_concern" style="background:#f1f5f9;color:#111;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Resolve</button>
+                </form>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; endif; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
+
+  <?php if($tab==='user_trades'):
+    $uid = (int)($_GET['user_id'] ?? 0);
+    $state = strtolower($_GET['status'] ?? 'all'); ?>
+    <form method="get" style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap">
+      <input type="hidden" name="tab" value="user_trades">
+      <select name="user_id" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px">
+        <option value="0" <?=$uid===0?'selected':''?>>All users (for special filters)</option>
+        <?php foreach($users as $u): ?>
+          <option value="<?=$u['id']?>" <?=$uid==$u['id']?'selected':''?>><?=h($u['label'])?></option>
+        <?php endforeach; ?>
+      </select>
+      <select name="status" style="padding:8px;border:1px solid #e5e7eb;border-radius:8px">
+        <?php foreach(['all','open','closed','unlocked','locked','deleted','required_unlock'] as $o): ?>
+          <option value="<?=$o?>" <?=$state===$o?'selected':''?>><?=ucwords(str_replace('_',' ',$o))?></option>
+        <?php endforeach; ?>
+      </select>
+      <button type="submit" style="background:#5a2bd9;color:#fff;border:0;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer">Filter</button>
+    </form>
+
+    <div style="overflow:auto;background:#fff;border-radius:12px;box-shadow:0 10px 28px rgba(16,24,40,.08)">
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead><tr style="background:#f8fafc">
+          <th style="padding:10px;text-align:left;">ID</th>
+          <th style="padding:10px;text-align:left;">Symbol</th>
+          <th style="padding:10px;text-align:left;">User</th>
+          <th style="padding:10px;text-align:left;">Entry</th>
+          <th style="padding:10px;text-align:left;">Outcome</th>
+          <th style="padding:10px;text-align:left;">P/L%</th>
+          <th style="padding:10px;text-align:left;">Unlock</th>
+          <th style="padding:10px;text-align:left;">State</th>
+          <th style="padding:10px;text-align:left;">Actions</th>
+        </tr></thead>
+        <tbody>
+        <?php if(empty($trades)): ?>
+          <tr><td colspan="9" style="padding:12px;color:#666">No trades.</td></tr>
+        <?php else: foreach($trades as $t):
+          $closed  = (strtoupper(t($t['outcome']))!=='OPEN' && $t['outcome']!=='');
+          $deleted = !empty($t['deleted_at']);
+          $unlock  = strtolower(t($t['unlock_status'] ?? 'none'));
+          if ($deleted)      $badge = '🗑 Deleted '.($t['deleted_by_admin']?'by Admin':'by User');
+          else if ($unlock==='approved') $badge='🟣 Unlocked';
+          else if ($unlock==='rejected') $badge='🔒 Locked';
+          else if ($closed)  $badge='⚫ Closed';
+          else               $badge='🟢 Open';
+        ?>
+          <tr style="border-top:1px solid #eef2f7">
+            <td style="padding:10px"><?=$t['id']?></td>
+            <td style="padding:10px"><a href="/trade_view.php?id=<?=$t['id']?>" style="color:#5a2bd9;font-weight:700;text-decoration:none"><?=h($t['symbol'])?></a></td>
+            <td style="padding:10px"><?=h($t['name'] ?: $t['email'])?></td>
+            <td style="padding:10px"><?=h($t['entry_date'])?></td>
+            <td style="padding:10px"><?=h($t['outcome'])?></td>
+            <td style="padding:10px;<?=((float)$t['pl_percent']>=0?'color:#065f46':'color:#b91c1c')?>;font-weight:700"><?=number_format((float)$t['pl_percent'],1)?></td>
+            <td style="padding:10px;font-weight:800"><?=strtoupper($t['unlock_status'] ?? 'NONE')?></td>
+            <td style="padding:10px"><?=h($badge)?></td>
+            <td style="padding:10px;white-space:nowrap">
+              <?php if(!$deleted): ?>
+                <?php if ($closed): ?>
+                  <?php if ($unlock!=='approved'): ?>
+                    <form method="post" style="display:inline">
+                      <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                      <input type="hidden" name="trade_id" value="<?=$t['id']?>">
+                      <input type="hidden" name="redir" value="trade_center.php?tab=user_trades&user_id=<?=$uid?>&status=<?=$state?>">
+                      <button name="action" value="force_unlock" style="background:#5a2bd9;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Unlock</button>
+                    </form>
+                  <?php endif; ?>
+                  <form method="post" style="display:inline;margin-left:6px">
+                    <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                    <input type="hidden" name="trade_id" value="<?=$t['id']?>">
+                    <input type="hidden" name="redir" value="trade_center.php?tab=user_trades&user_id=<?=$uid?>&status=<?=$state?>">
+                    <button name="action" value="force_lock" style="background:#ef4444;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Lock</button>
+                  </form>
+                <?php endif; ?>
+                <form method="post" style="display:inline;margin-left:6px">
+                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="trade_id" value="<?=$t['id']?>">
+                  <input type="hidden" name="redir" value="trade_center.php?tab=user_trades&user_id=<?=$uid?>&status=<?=$state?>">
+                  <input type="text" name="reason" placeholder="Reason" style="padding:6px;border:1px solid #e5e7eb;border-radius:8px;max-width:160px">
+                  <button name="action" value="soft_delete" style="background:#f59e0b;color:#111;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer;margin-left:6px">Delete</button>
+                </form>
+              <?php else: ?>
+                <form method="post" style="display:inline">
+                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="trade_id" value="<?=$t['id']?>">
+                  <input type="hidden" name="redir" value="trade_center.php?tab=user_trades&user_id=<?=$uid?>&status=<?=$state?>">
+                  <button name="action" value="restore" style="background:#10b981;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Restore</button>
+                </form>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; endif; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
+
+  <?php if($tab==='deleted'): ?>
+    <div style="overflow:auto;background:#fff;border-radius:12px;box-shadow:0 10px 28px rgba(16,24,40,.08)">
+      <table style="width:100%;border-collapse:collapse;font-size:14px">
+        <thead><tr style="background:#f8fafc">
+          <th style="padding:10px;text-align:left;">ID</th>
+          <th style="padding:10px;text-align:left;">User</th>
+          <th style="padding:10px;text-align:left;">Symbol</th>
+          <th style="padding:10px;text-align:left;">Entry</th>
+          <th style="padding:10px;text-align:left;">Deleted At</th>
+          <th style="padding:10px;text-align:left;">By</th>
+          <th style="padding:10px;text-align:left;">Reason</th>
+          <th style="padding:10px;text-align:left;">Action</th>
+        </tr></thead>
+        <tbody>
+        <?php if(empty($deleted)): ?>
+          <tr><td colspan="8" style="padding:12px;color:#666">No deleted trades.</td></tr>
+        <?php else: foreach($deleted as $d): ?>
+          <tr style="border-top:1px solid #eef2f7">
+            <td style="padding:10px"><?=$d['id']?></td>
+            <td style="padding:10px"><?=h($d['user_name'])?></td>
+            <td style="padding:10px"><a href="/trade_view.php?id=<?=$d['id']?>" style="text-decoration:none;color:#5a2bd9;font-weight:700"><?=h($d['symbol'])?></a></td>
+            <td style="padding:10px"><?=h($d['entry_date'])?></td>
+            <td style="padding:10px"><?=h($d['deleted_at'])?></td>
+            <td style="padding:10px"><?= $d['deleted_by_admin']?'Admin':'User'?></td>
+            <td style="padding:10px"><?=h($d['deleted_reason'] ?? '')?></td>
+            <td style="padding:10px">
+              <form method="post" style="display:inline">
+                <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                <input type="hidden" name="trade_id" value="<?=$d['id']?>">
+                <input type="hidden" name="redir" value="trade_center.php?tab=deleted">
+                <button name="action" value="restore" style="background:#10b981;color:#fff;border:0;border-radius:8px;padding:6px 10px;font-weight:700;cursor:pointer">Restore</button>
+              </form>
+            </td>
+          </tr>
+        <?php endforeach; endif; ?>
+        </tbody>
+      </table>
+    </div>
+  <?php endif; ?>
+
+  <div style="opacity:.5;font-size:12px;margin-top:10px;text-align:right">Trade Center <?=$VERSION?></div>
+</div>
+<?php include __DIR__ . '/../footer.php'; ?>

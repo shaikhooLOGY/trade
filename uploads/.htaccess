@@ -1,0 +1,7 @@
+# Disallow PHP execution inside uploads
+RemoveHandler .php
+RemoveType .php
+<FilesMatch "\.(php|php\d?)$">
+  Order allow,deny
+  Deny from all
+</FilesMatch>

@@ -1,0 +1,4 @@
+if (file_exists(__DIR__.'/maintenance.flag')) {
+  echo '<h2>Site under maintenance. Come back soon.</h2>';
+  exit;
+}
