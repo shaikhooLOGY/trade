@@ -9,9 +9,13 @@ if (!defined('APP_ENV')) {
     $appEnv = 'local'; // default if .env missing
 
     // Check both possible locations for .env file
-    $envFile = __DIR__ . '/../.env';
+    // Priority: .env.local (local override) → .env (production) → fallback
+    $envFile = __DIR__ . '/../.env.local'; // Try local override first
     if (!file_exists($envFile)) {
-        $envFile = __DIR__ . '/.env';
+        $envFile = __DIR__ . '/../.env';
+        if (!file_exists($envFile)) {
+            $envFile = __DIR__ . '/.env';
+        }
     }
     if (is_readable($envFile)) {
         $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);

@@ -20,6 +20,20 @@ $st->execute();
 $user = $st->get_result()->fetch_assoc();
 $st->close();
 
+/* Load user profile data if available */
+$profile_data = null;
+try {
+    $sql_profile = "SELECT * FROM user_profiles WHERE user_id = ? LIMIT 1";
+    $st_profile = $mysqli->prepare($sql_profile);
+    $st_profile->bind_param('i', $uid);
+    $st_profile->execute();
+    $profile_data = $st_profile->get_result()->fetch_assoc();
+    $st_profile->close();
+} catch (Exception $e) {
+    // user_profiles table might not exist
+    app_log("Error loading profile data: " . $e->getMessage());
+}
+
 if (!$user) { $_SESSION['flash'] = 'User not found.'; header('Location: users.php'); exit; }
 
 /* current admin role for guard logic */
@@ -39,13 +53,59 @@ $actionTaken = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && hash_equals($csrf, $_POST['csrf'] ?? '')) {
     $act = $_POST['action'] ?? '';
     if ($act === 'approve') {
-        if (!in_array($user['status'], ['active','approved'], true)) {
+        // Enhanced approval logic for new registration workflow
+        $current_status = strtolower($user['status'] ?? 'pending');
+        
+        if (in_array($current_status, ['active','approved'], true)) {
+            $actionTaken = 'User already approved';
+        } elseif ($current_status === 'admin_review') {
+            // Approve user from admin_review status
+            $st = $mysqli->prepare("UPDATE users SET status='approved' WHERE id=?");
+            $st->bind_param('i', $uid);
+            $st->execute(); $st->close();
+            
+            // Update profile status if user_profiles table exists
+            if ($profile_data) {
+                $st2 = $mysqli->prepare("UPDATE user_profiles SET admin_review_status='approved', admin_review_date=NOW(), admin_reviewed_by=? WHERE user_id=?");
+                $st2->bind_param('ii', $_SESSION['user_id'], $uid);
+                $st2->execute(); $st2->close();
+            }
+            
+            // Send approval email notification
+            send_approval_email($user['email'], $user['name'] ?: 'Member', true);
+            
+            $actionTaken = 'User approved and email sent';
+            $user['status'] = 'approved';
+        } elseif (in_array($current_status, ['pending', 'profile_pending'], true)) {
+            // Direct approval for early stages
             $st = $mysqli->prepare("UPDATE users SET status='active' WHERE id=?");
             $st->bind_param('i', $uid);
             $st->execute(); $st->close();
-            $actionTaken = 'Approved';
+            
+            $actionTaken = 'User approved';
             $user['status'] = 'active';
+        } else {
+            $actionTaken = 'Cannot approve user with status: ' . $current_status;
         }
+    } elseif ($act === 'reject') {
+        // New reject action for admin_review
+        $reason = trim((string)($_POST['reason'] ?? ''));
+        $st = $mysqli->prepare("UPDATE users SET status='rejected', rejection_reason=? WHERE id=?");
+        $st->bind_param('si', $reason, $uid);
+        $st->execute(); $st->close();
+        
+        // Update profile status if user_profiles table exists
+        if ($profile_data) {
+            $st2 = $mysqli->prepare("UPDATE user_profiles SET admin_review_status='rejected', admin_review_date=NOW(), admin_reviewed_by=?, admin_review_comments=? WHERE user_id=?");
+            $st2->bind_param('isi', $_SESSION['user_id'], $reason, $uid);
+            $st2->execute(); $st2->close();
+        }
+        
+        // Send rejection email notification
+        send_approval_email($user['email'], $user['name'] ?: 'Member', false, $reason);
+        
+        $actionTaken = 'User rejected and email sent';
+        $user['status'] = 'rejected';
     } elseif ($act === 'send_back') {
         // Ask user to update (needs_update) + optional per-field remarks
         $reason = trim((string)($_POST['reason'] ?? ''));
@@ -199,6 +259,8 @@ include __DIR__ . '/../header.php';
             $sBadge = '<span class="badge b-pending">pending</span>';
             if ($status==='active' || $status==='approved') $sBadge = '<span class="badge b-active">active</span>';
             elseif ($status==='needs_update') $sBadge = '<span class="badge b-update">needs_update</span>';
+            elseif ($status==='profile_pending') $sBadge = '<span class="badge b-unverified">profile_pending</span>';
+            elseif ($status==='admin_review') $sBadge = '<span class="badge b-pending">admin_review</span>';
             elseif ($status==='unverified')   $sBadge = '<span class="badge b-unverified">unverified</span>';
             elseif ($status==='rejected')      $sBadge = '<span class="badge b-rejected">rejected</span>';
             echo $sBadge;
@@ -209,6 +271,16 @@ include __DIR__ . '/../header.php';
           ?>
         </div>
         <div style="opacity:.85"><?= h($user['email'] ?? '') ?></div>
+        <div style="margin-top:8px; font-size:12px; color:#93c5fd;">
+          <?php if ($profile_data): ?>
+            <strong>Profile:</strong> Complete
+            <?php if (!empty($profile_data['completeness_score'])): ?>
+              (<?= (int)$profile_data['completeness_score'] ?>% complete)
+            <?php endif; ?>
+          <?php else: ?>
+            <strong>Profile:</strong> Incomplete
+          <?php endif; ?>
+        </div>
         <?php
         // Note: promoted_by and promoter_name columns may not exist in database
         // These features are disabled until columns are added to database
@@ -220,7 +292,22 @@ include __DIR__ . '/../header.php';
       <div class="actions">
         <a class="btn-back" href="users.php">← Back to User Management</a>
 
-        <?php if ($canApprove): ?>
+        <?php if ($status === 'admin_review'): ?>
+          <!-- New Registration Workflow Actions -->
+          <form method="post" style="display:inline" onsubmit="return confirm('Are you sure you want to approve this user?');">
+            <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+            <input type="hidden" name="action" value="approve">
+            <button class="btn btn-approve" type="submit">✅ Approve & Send Email</button>
+          </form>
+          
+          <form method="post" style="display:inline" onsubmit="var r=prompt('Reason for rejection (required):',''); if(r===null || r.trim()==='') return false; this.reason.value=r; return confirm('Reject this user?');">
+            <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+            <input type="hidden" name="action" value="reject">
+            <input type="hidden" name="reason" value="">
+            <button class="btn btn-delete" type="submit">❌ Reject & Send Email</button>
+          </form>
+        <?php elseif ($canApprove): ?>
+          <!-- Legacy approval for other statuses -->
           <?php
             $ac = 'btn-approve';
             if ($status==='needs_update') $ac .= ' orange';

@@ -12,6 +12,10 @@ $stats = [
     'pending_concerns' => 0,
     'active_mtm_models' => 0,
     'schema_issues' => 0,
+    'new_registrations' => 0,
+    'profile_pending' => 0,
+    'admin_review' => 0,
+    'awaiting_approval' => 0,
 ];
 
 // 1. Get pending trade concerns count
@@ -39,6 +43,35 @@ try {
         $stats['schema_issues'] += count($table_issues);
     }
 } catch (Exception $e) { /* Ignore if schema manager fails */ }
+
+// 4. Get new registration workflow stats
+try {
+    // Check if status column exists in users table
+    if (db_has_col($mysqli, 'users', 'status')) {
+        // New registrations (pending)
+        $q_pending = $mysqli->query("SELECT COUNT(*) AS c FROM users WHERE status='pending'");
+        if ($q_pending && ($row = $q_pending->fetch_assoc())) {
+            $stats['new_registrations'] = (int)$row['c'];
+        }
+        
+        // Profile pending (OTP verified, waiting for profile completion)
+        $q_profile_pending = $mysqli->query("SELECT COUNT(*) AS c FROM users WHERE status='profile_pending'");
+        if ($q_profile_pending && ($row = $q_profile_pending->fetch_assoc())) {
+            $stats['profile_pending'] = (int)$row['c'];
+        }
+        
+        // Admin review (profile completed, waiting for admin approval)
+        $q_admin_review = $mysqli->query("SELECT COUNT(*) AS c FROM users WHERE status='admin_review'");
+        if ($q_admin_review && ($row = $q_admin_review->fetch_assoc())) {
+            $stats['admin_review'] = (int)$row['c'];
+        }
+        
+        // Total awaiting approval (profile_pending + admin_review)
+        $stats['awaiting_approval'] = $stats['profile_pending'] + $stats['admin_review'];
+    }
+} catch (Exception $e) {
+    app_log("Error fetching registration stats: " . $e->getMessage());
+}
 
 // --- Page Setup ---
 include __DIR__ . '/../header.php';
@@ -159,11 +192,21 @@ include __DIR__ . '/../header.php';
   </div>
 
   <div class="row">
+    <!-- User Registration Management -->
+    <div class="card" onclick="window.location='users.php?filter=new_registrations'">
+      <div class="card-content">
+        <h3>🎯 User Registration Workflow</h3>
+        <p>Review new user registrations, OTP verification, and profile completion status.</p>
+        <a href="users.php?filter=new_registrations" class="btn">View Registrations</a>
+        <?php if ($stats['awaiting_approval'] > 0) echo "<span class='badge'>{$stats['awaiting_approval']} Awaiting</span>"; ?>
+      </div>
+    </div>
+
     <!-- Users -->
     <div class="card" onclick="window.location='users.php'">
       <div class="card-content">
-        <h3>👥 Users Management</h3>
-        <p>Review, approve, or promote/demote traders in the championship league.</p>
+        <h3>👥 All Users</h3>
+        <p>Manage all registered users, approve, deactivate, or modify user accounts.</p>
         <a href="users.php" class="btn">Manage Users</a>
       </div>
     </div>

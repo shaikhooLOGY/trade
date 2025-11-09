@@ -601,7 +601,10 @@ try {
     
     /* Print optimizations */
     @media print {
-        body { -webkit-print-color-adjust: exact; }
+        body { 
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
         .pdf-header, .pdf-footer, .disclaimers-section { page-break-inside: avoid; }
         table { page-break-inside: auto; }
         tr { page-break-inside: avoid; }

@@ -1,7 +1,8 @@
 <?php
-// pending_approval.php — Account review gate (copy-paste ready)
+// pending_approval.php — Account review gate with OTP email verification
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/functions.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 
 // Must be signed in
@@ -28,10 +29,37 @@ if (!$user) {
 }
 
 // Flow enforcement
-// 1) Unverified -> verify page
+// 1) Email not verified -> OTP verification step
 if ((int)$user['email_verified'] !== 1) {
-  header('Location: /verify_profile.php?email=' . urlencode($user['email']));
-  exit;
+  // This is the OTP verification step
+  $show_otp_verification = true;
+} else {
+  $show_otp_verification = false;
+  
+  // 2) Email verified but profile not completed -> Profile completion step
+  // Check if user has basic profile data (fallback method)
+  $has_basic_profile = false;
+  try {
+    $stmt = $mysqli->prepare("SELECT full_name, phone, trading_experience FROM users WHERE id=? LIMIT 1");
+    if ($stmt) {
+      $stmt->bind_param('i', $uid);
+      $stmt->execute();
+      $result = $stmt->get_result();
+      $profile = $result->fetch_assoc();
+      $stmt->close();
+      
+      if ($profile && !empty($profile['full_name']) && !empty($profile['phone']) && !empty($profile['trading_experience'])) {
+        $has_basic_profile = true;
+      }
+    }
+  } catch (Exception $e) {
+    app_log("Error checking profile completion: " . $e->getMessage());
+  }
+  
+  if (!$has_basic_profile) {
+    // Redirect to profile completion
+    header('Location: /profile_completion.php'); exit;
+  }
 }
 
 // 2) Approved/Active -> dashboard
@@ -79,10 +107,60 @@ if (isset($_GET['just_verified'])) {
   $flash_ok = "✅ Email verified! Ab apna profile complete/refresh karke 'Save' karein. Admin review ke baad aapko approve kiya jayega.";
 }
 
+// Handle OTP verification
+$otp_err = '';
+$otp_success = '';
+if ($show_otp_verification && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_otp'])) {
+  $otp_code = trim((string)($_POST['otp_code'] ?? ''));
+  
+  if (empty($otp_code)) {
+    $otp_err = "Please enter the verification code.";
+  } elseif (!preg_match('/^\d{6}$/', $otp_code)) {
+    $otp_err = "Verification code must be 6 digits.";
+  } else {
+    // Verify OTP
+    $verification_result = otp_verify_code($uid, $otp_code);
+    
+    if ($verification_result['success']) {
+      $otp_success = $verification_result['message'];
+      // Refresh user data to get updated email_verified status
+      if ($st = $mysqli->prepare("SELECT * FROM users WHERE id=? LIMIT 1")) {
+        $st->bind_param('i', $uid);
+        $st->execute();
+        $user = $st->get_result()->fetch_assoc();
+        $st->close();
+      }
+      // Redirect to refresh the page and show profile form
+      header('Location: /pending_approval.php?verified=1');
+      exit;
+    } else {
+      $otp_err = $verification_result['message'];
+    }
+  }
+}
+
+// Handle resend OTP
+if ($show_otp_verification && isset($_POST['resend_otp'])) {
+  // Check rate limiting
+  $rate_limit = otp_rate_limit_check($uid, $user['email']);
+  
+  if (!$rate_limit['allowed']) {
+    $otp_err = $rate_limit['message'];
+  } else {
+    // Resend OTP
+    $resent = otp_send_verification_email($uid, $user['email'], $user['name']);
+    if ($resent) {
+      $otp_success = "New verification code sent to your email!";
+    } else {
+      $otp_err = "Failed to send verification code. Please try again later.";
+    }
+  }
+}
+
 // Handle profile update/submit
 $err = '';
 $val = [];
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
+if (!$show_otp_verification && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
   foreach ($profile_fields as $field => $cfg) {
     $val[$field] = trim((string)($_POST[$field] ?? ''));
     if (!empty($cfg['required']) && $val[$field] === '') {
@@ -172,14 +250,22 @@ if (!in_array($profile_status, ['pending','needs_update','approved','under_revie
     <div class="card">
       <h2 style="margin:0 0 8px">
         Account Review
-        <?php
-          $badgeClass = $profile_status==='needs_update'?'b-needs':($profile_status==='approved'?'b-approved':($profile_status==='under_review'?'b-review':'b-pending'));
-          $badgeText  = $profile_status==='needs_update'?'Needs Update':($profile_status==='approved'?'Approved':($profile_status==='under_review'?'Under Review':'Pending'));
-        ?>
-        <span class="badge <?= $badgeClass ?>"><?= h($badgeText) ?></span>
+        <?php if ($show_otp_verification): ?>
+          <span class="badge b-pending">Email Verification Required</span>
+        <?php else: ?>
+          <?php
+            $badgeClass = $profile_status==='needs_update'?'b-needs':($profile_status==='approved'?'b-approved':($profile_status==='under_review'?'b-review':'b-pending'));
+            $badgeText  = $profile_status==='needs_update'?'Needs Update':($profile_status==='approved'?'Approved':($profile_status==='under_review'?'Under Review':'Pending'));
+          ?>
+          <span class="badge <?= $badgeClass ?>"><?= h($badgeText) ?></span>
+        <?php endif; ?>
       </h2>
       <p>User: <strong><?= h($user['name']) ?></strong> · Email: <strong><?= h($user['email']) ?></strong></p>
-      <p>Email Status: <span style="color:#16a34a">✅ Verified</span></p>
+      <?php if ($show_otp_verification): ?>
+        <p>Email Status: <span style="color:#dc2626">⏳ Verification Required</span></p>
+      <?php else: ?>
+        <p>Email Status: <span style="color:#16a34a">✅ Verified</span></p>
+      <?php endif; ?>
     </div>
 
     <?php if ($flash_ok): ?>
@@ -190,8 +276,54 @@ if (!in_array($profile_status, ['pending','needs_update','approved','under_revie
       <div class="ok"><?= h($_SESSION['flash']); unset($_SESSION['flash']); ?></div>
     <?php endif; ?>
 
+    <?php if ($otp_err): ?>
+      <div class="err"><?= h($otp_err) ?></div>
+    <?php endif; ?>
+
+    <?php if ($otp_success): ?>
+      <div class="ok"><?= h($otp_success) ?></div>
+    <?php endif; ?>
+
     <?php if ($err): ?>
       <div class="err"><?= h($err) ?></div>
+    <?php endif; ?>
+
+    <?php if ($show_otp_verification): ?>
+      <!-- OTP Verification Form -->
+      <div class="card" style="background:#f0f9ff;border-left:4px solid #0ea5e9">
+        <h3 style="margin-top:0;color:#0c4a6e">📧 Email Verification Required</h3>
+        <p style="color:#0c4a6e;margin:0 0 20px 0">
+          To complete your registration, please verify your email address. We've sent a 6-digit verification code to:
+          <strong><?= h($user['email']) ?></strong>
+        </p>
+        
+        <form method="post" style="margin-top:20px" novalidate>
+          <div class="field">
+            <label for="otp_code" style="color:#0c4a6e">Enter 6-digit verification code:</label>
+            <input class="input" id="otp_code" name="otp_code" type="text" maxlength="6" pattern="[0-9]{6}"
+                   placeholder="123456" required
+                   style="font-size:18px;text-align:center;letter-spacing:4px;font-weight:bold">
+          </div>
+          
+          <button type="submit" name="verify_otp" class="btn" style="background:#0ea5e9;margin-right:10px">
+            ✅ Verify Email
+          </button>
+          
+          <button type="submit" name="resend_otp" class="btn" style="background:#6b7280">
+            📧 Resend Code
+          </button>
+        </form>
+        
+        <div style="margin-top:15px;padding:10px;background:#e0f2fe;border-radius:6px;font-size:13px;color:#0c4a6e">
+          <strong>💡 Tips:</strong>
+          <ul style="margin:5px 0 0 20px;padding:0">
+            <li>Check your spam/junk folder if you don't see the email</li>
+            <li>Code expires in 30 minutes</li>
+            <li>You have 3 attempts to verify</li>
+            <li>Wait 5 minutes before requesting a new code</li>
+          </ul>
+        </div>
+      </div>
     <?php endif; ?>
 
     <?php if ($status === 'rejected'): ?>
@@ -224,39 +356,47 @@ if (!in_array($profile_status, ['pending','needs_update','approved','under_revie
       </div>
     <?php endif; ?>
 
-    <div class="card">
-      <h3 style="margin-top:0">Complete/Update Your Profile</h3>
-      <p>Aapka account approve hone ke liye niche form sahi tarah se fill karke <strong>save</strong> karein. (Admin review karega.)</p>
+    <?php if (!$show_otp_verification): ?>
+      <div class="card">
+        <h3 style="margin-top:0">Complete/Update Your Profile</h3>
+        <p>Aapka account approve hone ke liye niche form sahi tarah se fill karke <strong>save</strong> karein. (Admin review karega.)</p>
 
-      <form method="post" style="margin-top:16px" novalidate>
-        <input type="hidden" name="update_profile" value="1">
-        <?php foreach ($profile_fields as $field => $cfg): ?>
-          <div class="field">
-            <label for="<?= h($field) ?>">
-              <?= h($cfg['label']) ?> <?= !empty($cfg['required'])?'<span style="color:#dc2626">*</span>':'' ?>
-            </label>
-            <?php if (($cfg['type'] ?? '') === 'select'): ?>
-              <select class="input" id="<?= h($field) ?>" name="<?= h($field) ?>" <?= !empty($cfg['required'])?'required':'' ?>>
-                <?php foreach (($cfg['options'] ?? []) as $valOpt => $labelOpt): ?>
-                  <option value="<?= h($valOpt) ?>" <?= (($val[$field] ?? '')===$valOpt)?'selected':'' ?>>
-                    <?= h($labelOpt) ?>
-                  </option>
-                <?php endforeach; ?>
-              </select>
-            <?php elseif (($cfg['type'] ?? '') === 'textarea'): ?>
-              <textarea class="input" id="<?= h($field) ?>" name="<?= h($field) ?>" placeholder="<?= h($cfg['placeholder'] ?? '') ?>" <?= !empty($cfg['required'])?'required':'' ?> style="height:90px"><?= h($val[$field] ?? '') ?></textarea>
-            <?php else: ?>
-              <input class="input" id="<?= h($field) ?>" type="<?= h($cfg['type'] ?? 'text') ?>" name="<?= h($field) ?>"
-                     value="<?= h($val[$field] ?? '') ?>" placeholder="<?= h($cfg['placeholder'] ?? '') ?>"
-                     <?= !empty($cfg['required'])?'required':'' ?>>
-            <?php endif; ?>
-          </div>
-        <?php endforeach; ?>
+        <form method="post" style="margin-top:16px" novalidate>
+          <input type="hidden" name="update_profile" value="1">
+          <?php foreach ($profile_fields as $field => $cfg): ?>
+            <div class="field">
+              <label for="<?= h($field) ?>">
+                <?= h($cfg['label']) ?> <?= !empty($cfg['required'])?'<span style="color:#dc2626">*</span>':'' ?>
+              </label>
+              <?php if (($cfg['type'] ?? '') === 'select'): ?>
+                <select class="input" id="<?= h($field) ?>" name="<?= h($field) ?>" <?= !empty($cfg['required'])?'required':'' ?>>
+                  <?php foreach (($cfg['options'] ?? []) as $valOpt => $labelOpt): ?>
+                    <option value="<?= h($valOpt) ?>" <?= (($val[$field] ?? '')===$valOpt)?'selected':'' ?>>
+                      <?= h($labelOpt) ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              <?php elseif (($cfg['type'] ?? '') === 'textarea'): ?>
+                <textarea class="input" id="<?= h($field) ?>" name="<?= h($field) ?>" placeholder="<?= h($cfg['placeholder'] ?? '') ?>" <?= !empty($cfg['required'])?'required':'' ?> style="height:90px"><?= h($val[$field] ?? '') ?></textarea>
+              <?php else: ?>
+                <input class="input" id="<?= h($field) ?>" type="<?= h($cfg['type'] ?? 'text') ?>" name="<?= h($field) ?>"
+                       value="<?= h($val[$field] ?? '') ?>" placeholder="<?= h($cfg['placeholder'] ?? '') ?>"
+                       <?= !empty($cfg['required'])?'required':'' ?>>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
 
-        <button type="submit" class="btn">💾 Save & Resubmit</button>
+          <button type="submit" class="btn">💾 Save & Resubmit</button>
+          <a href="/logout.php" class="btn btn-logout">🚪 Logout</a>
+        </form>
+      </div>
+    <?php else: ?>
+      <div class="card">
+        <h3 style="margin-top:0">Complete Your Profile</h3>
+        <p style="color:#6b7280">Please verify your email address first to complete your profile.</p>
         <a href="/logout.php" class="btn btn-logout">🚪 Logout</a>
-      </form>
-    </div>
+      </div>
+    <?php endif; ?>
   </div>
 
   <div class="footer">© Shaikhoology — Trading Psychology | Since 2021.</div>

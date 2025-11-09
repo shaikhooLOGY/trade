@@ -20,15 +20,51 @@ if ($st = $mysqli->prepare("SELECT role, is_admin FROM users WHERE id=?")) {
   $st->close();
 }
 
-/* PENDING bucket: pending + needs_update + unverified + rejected (not active/approved) */
+/* Get filter from URL parameter */
+$filter = $_GET['filter'] ?? 'all';
+
+// Filter users based on status for new registration workflow
+$registration_workflow = [];
+$profile_pending = [];
+$admin_review = [];
 $pending = [];
-$qr = $mysqli->query("
+$all_users = [];
+
+/* New Registration Workflow - Users in the new registration process */
+$qr_workflow = $mysqli->query("
   SELECT id, name, email, status, email_verified, created_at, role, is_admin
   FROM users
-  WHERE status IN ('pending','needs_update','unverified','rejected')
+  WHERE status IN ('pending', 'profile_pending', 'admin_review')
   ORDER BY created_at DESC
+  LIMIT 200
 ");
-if ($qr) { while ($x = $qr->fetch_assoc()) $pending[] = $x; $qr->free(); }
+if ($qr_workflow) {
+  while ($x = $qr_workflow->fetch_assoc()) {
+    $registration_workflow[] = $x;
+    // Categorize by status
+    if ($x['status'] === 'pending') {
+      $pending[] = $x;
+    } elseif ($x['status'] === 'profile_pending') {
+      $profile_pending[] = $x;
+    } elseif ($x['status'] === 'admin_review') {
+      $admin_review[] = $x;
+    }
+  }
+  $qr_workflow->free();
+}
+
+/* Legacy pending bucket: needs_update + unverified + rejected (not active/approved) */
+$qr_legacy = $mysqli->query("
+  SELECT id, name, email, status, email_verified, created_at, role, is_admin
+  FROM users
+  WHERE status IN ('needs_update','unverified','rejected') AND email_verified = 0
+  ORDER BY created_at DESC
+  LIMIT 200
+");
+if ($qr_legacy) {
+  while ($x = $qr_legacy->fetch_assoc()) $pending[] = $x;
+  $qr_legacy->free();
+}
 
 /* ALL USERS (everyone) — for overview + restrictive actions */
 $users = [];
@@ -104,10 +140,114 @@ a:hover{ color:#bfdbfe; text-decoration:underline; }
     <div class="flash"><?= h($_SESSION['flash']); unset($_SESSION['flash']); ?></div>
   <?php endif; ?>
 
-  <div class="section-bar"><span class="emoji">⏳</span><span>Pending / Needs Update / Unverified</span></div>
+  <!-- Filter Tabs -->
+  <div class="section-bar">
+    <span class="emoji">🎯</span>
+    <span>User Registration Workflow</span>
+    <div style="margin-left:auto; display:flex; gap:10px;">
+      <a href="?filter=all" class="btn <?= $filter==='all' ? 'btn-primary' : 'btn-secondary' ?>" style="padding:6px 12px; font-size:12px;">All Users</a>
+      <a href="?filter=new_registrations" class="btn <?= $filter==='new_registrations' ? 'btn-primary' : 'btn-secondary' ?>" style="padding:6px 12px; font-size:12px;">New Registrations</a>
+      <a href="?filter=profile_pending" class="btn <?= $filter==='profile_pending' ? 'btn-primary' : 'btn-secondary' ?>" style="padding:6px 12px; font-size:12px;">Profile Pending</a>
+      <a href="?filter=admin_review" class="btn <?= $filter==='admin_review' ? 'btn-primary' : 'btn-secondary' ?>" style="padding:6px 12px; font-size:12px;">Admin Review</a>
+    </div>
+  </div>
+
+  <!-- New Registration Workflow Section -->
+  <?php if ($filter === 'new_registrations' || $filter === 'all'): ?>
+  <div class="section-bar" style="background:linear-gradient(90deg,#3b82f6,#1d4ed8); margin-top:18px 0 10px;">
+    <span class="emoji">🎯</span><span>New Registration Workflow (Pending, Profile Pending, Admin Review)</span>
+    <?php if (count($registration_workflow) > 0): ?>
+      <span style="margin-left:auto; background:rgba(255,255,255,0.2); padding:4px 12px; border-radius:20px; font-size:12px;">
+        <?= count($registration_workflow) ?> users
+      </span>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+
+  <?php if (($filter === 'new_registrations' || $filter === 'all') && !empty($registration_workflow)): ?>
+  <div class="card">
+    <table class="table" id="registrationTable">
+      <thead>
+        <tr>
+          <th>#</th><th>Name</th><th>Email</th><th>Status</th>
+          <th>Email Verified</th><th>Profile Complete</th><th>Joined</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach($registration_workflow as $p):
+          $s = strtolower((string)$p['status']);
+          $badge = 'st-purple';
+          $label = $s;
+          if ($s==='active'||$s==='approved'){ $badge='st-green'; }
+          elseif ($s==='unverified'){ $badge='st-yellow'; }
+          elseif ($s==='needs_update'){ $badge='st-orange'; }
+          elseif ($s==='rejected'){ $badge='st-red'; }
+          elseif ($s==='profile_pending'){ $badge='st-yellow'; }
+          elseif ($s==='admin_review'){ $badge='st-purple'; }
+          $role = strtolower((string)($p['role'] ?: (($p['is_admin']??0)?'admin':'user')));
+          
+          // Check if profile is complete (has user_profiles record)
+          $profile_complete = false;
+          try {
+            $stmt = $mysqli->prepare("SELECT id FROM user_profiles WHERE user_id=? LIMIT 1");
+            $stmt->bind_param('i', $p['id']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $profile_complete = $result->num_rows > 0;
+            $stmt->close();
+          } catch (Exception $e) {
+            // ignore if table doesn't exist
+          }
+        ?>
+          <tr>
+            <td><?= (int)$p['id'] ?></td>
+            <td>
+              <a href="user_profile.php?id=<?= (int)$p['id'] ?>"><?= h($p['name'] ?: '—') ?></a>
+              <?php if ($role==='superadmin'): ?><span class="role role-super">Superadmin</span>
+              <?php elseif ($role==='admin'): ?><span class="role role-admin">Admin</span><?php endif; ?>
+            </td>
+            <td><?= h($p['email']) ?></td>
+            <td><span class="badge <?= $badge ?>"><?= h($label) ?></span></td>
+            <td class="chk"><?= ((int)$p['email_verified'] ? '<span class="chk-yes">✔</span>' : '<span class="chk-no">✖</span>') ?></td>
+            <td class="chk"><?= $profile_complete ? '<span class="chk-yes">✔</span>' : '<span class="chk-no">✖</span>' ?></td>
+            <td class="muted"><?= h($p['created_at']) ?></td>
+            <td class="actions">
+              <!-- Actions for new registration workflow -->
+              <?php if ($p['status'] === 'admin_review'): ?>
+                <a href="user_profile.php?id=<?= (int)$p['id'] ?>&action=review" class="btn btn-secondary" style="padding:6px 10px; font-size:11px;">
+                  Review Profile
+                </a>
+              <?php else: ?>
+                <a href="user_profile.php?id=<?= (int)$p['id'] ?>" class="btn btn-secondary" style="padding:6px 10px; font-size:11px;">
+                  View Details
+                </a>
+              <?php endif; ?>
+              
+              <form method="post" action="user_action.php" style="display:inline; margin-left:5px;"
+                    onsubmit="var r=prompt('Reason (optional):','Please complete your registration.'); if(r===null)return false; this.reason.value=r;">
+                <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+                <input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
+                <input type="hidden" name="action" value="send_back">
+                <input type="hidden" name="reason" value="">
+                <button class="btn btn-secondary" type="submit" style="padding:6px 10px; font-size:11px;">Send Back</button>
+              </form>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <?php elseif ($filter === 'new_registrations' || $filter === 'all'): ?>
+  <div class="card">
+    <p style="padding:14px 16px" class="muted">No users in new registration workflow.</p>
+  </div>
+  <?php endif; ?>
+
+  <!-- Legacy Pending Section -->
+  <div class="section-bar" style="margin-top:22px;"><span class="emoji">⏳</span><span>Legacy Pending / Needs Update / Unverified</span></div>
   <div class="card">
     <?php if (empty($pending)): ?>
-      <p style="padding:14px 16px" class="muted">No pending records.</p>
+      <p style="padding:14px 16px" class="muted">No legacy pending records.</p>
     <?php else: ?>
       <table class="table" id="pendingTable">
         <thead>
@@ -136,7 +276,7 @@ a:hover{ color:#bfdbfe; text-decoration:underline; }
               <td class="chk"><?= ((int)$p['email_verified'] ? '<span class="chk-yes">✔</span>' : '<span class="chk-no">✖</span>') ?></td>
               <td class="muted"><?= h($p['created_at']) ?></td>
               <td class="actions">
-                <!-- Only pending bucket can show Send Back / Reject -->
+                <!-- Only legacy pending bucket can show Send Back / Reject -->
                 <form method="post" action="user_action.php"
                       onsubmit="var r=prompt('Reason (optional):','Please update required fields.'); if(r===null)return false; this.reason.value=r;">
                   <input type="hidden" name="csrf" value="<?= h($csrf) ?>">

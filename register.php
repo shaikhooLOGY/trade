@@ -1,6 +1,7 @@
 <?php
-// register.php — User registration with direct login after successful account creation
+// register.php — User registration with OTP email verification
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/includes/functions.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
@@ -67,14 +68,37 @@ if (!empty($_SESSION['user_id'])) { header('Location: /dashboard.php'); exit; }
 $err = '';
 $ok = '';
 $rate_limit_error = '';
-$val = ['name'=>'','email'=>'','username'=>''];
+$val = ['name'=>'','email'=>'','username'=>'','password'=>'','confirm'=>''];
+
+// Database connection check for form
+$db_error = false;
+try {
+    if (!isset($mysqli) || !$mysqli instanceof mysqli) {
+        $db_error = true;
+    } else {
+        $connectionProbe = @$mysqli->query('SELECT 1');
+        if ($connectionProbe === false) {
+            $db_error = true;
+        } elseif ($connectionProbe instanceof mysqli_result) {
+            $connectionProbe->free();
+        }
+    }
+} catch (Exception $e) {
+    $db_error = true;
+}
 
 if ($_SERVER['REQUEST_METHOD']==='POST') {
+  error_log("=== REGISTRATION POST STARTED ===");
+  error_log("POST data received: " . json_encode(array_keys($_POST)));
+  error_log("CSRF check: Session csrf=" . ($_SESSION['reg_csrf'] ?? 'NOT SET') . ", Submitted csrf=" . ($_POST['csrf'] ?? 'NOT SET'));
+  
   // CSRF check
   $submitted_csrf = $_POST['csrf'] ?? '';
   if (!hash_equals($csrf, $submitted_csrf)) {
     $err = 'Invalid request. Please reload and try again. (Galat request, page reload karke dubara koshish karein)';
+    error_log("CSRF validation failed!");
   } else {
+    error_log("CSRF validation passed");
     // Check rate limiting
     if (isset($rate_limit_error)) {
       $err = $rate_limit_error;
@@ -85,12 +109,13 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
       $username = trim($_POST['username'] ?? '');
       $password = (string)($_POST['password'] ?? '');
       $confirm = (string)($_POST['confirm'] ?? '');
+      $val['name']=$name; $val['email']=$email; $val['username']=$username;
+      $val['password']=$password; $val['confirm']=$confirm;
       $accept_terms = isset($_POST['accept_terms']) ? (bool)$_POST['accept_terms'] : false;
       $accept_legal_disclaimer = isset($_POST['accept_legal_disclaimer']) ? (bool)$_POST['accept_legal_disclaimer'] : false;
       $accept_privacy_policy = isset($_POST['accept_privacy_policy']) ? (bool)$_POST['accept_privacy_policy'] : false;
       $accept_email_access = isset($_POST['accept_email_access']) ? (bool)$_POST['accept_email_access'] : false;
       $accept_all = isset($_POST['accept_all']) ? (bool)$_POST['accept_all'] : false;
-      $val['name']=$name; $val['email']=$email; $val['username']=$username;
 
       // Validate inputs
       if ($name==='' || $email==='' || $username==='' || $password==='' || $confirm==='') {
@@ -99,9 +124,12 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         $err = 'You must accept all required terms. (Sabhi required terms ko accept karna zaroori hai.)';
       } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $err = 'Invalid email. (Email sahi nahi hai.)';
+        error_log("Email validation failed for: " . $email);
       } elseif (!preg_match('/^[A-Za-z0-9_.]{3,32}$/', $username)) {
         $err = 'Username invalid. Use 3-32 chars: letters, numbers, underscore, dot. (Username galat hai.)';
+        error_log("Username validation failed for: " . $username);
       } else {
+        error_log("Basic validation passed, checking sensitive usernames");
         // Check against sensitive username blacklist
         $sensitive_usernames = [
           'admin', 'administrator', 'root', 'system', 'support', 'help', 'info',
@@ -116,11 +144,15 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
         
         if (in_array(strtolower($username), $sensitive_usernames) && strtolower($username) !== 'shaikhoology') {
           $err = 'This username is protected and cannot be used. (Yeh username protected hai.)';
+          error_log("Username in sensitive list: " . $username);
         } elseif (strlen($password) < 8) {
           $err = 'Password must be at least 8 characters. (Password 8 characters ka hona chahiye.)';
+          error_log("Password too short: " . strlen($password) . " chars");
         } elseif ($password !== $confirm) {
           $err = 'Passwords do not match. (Passwords match nahi karte.)';
+          error_log("Passwords do not match");
         } else {
+          error_log("All password checks passed, starting database operations");
           try {
             $mysqli->begin_transaction();
             
@@ -134,7 +166,9 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
             if ($emailExists) {
               $mysqli->rollback();
               $err = 'Email already registered. (Email pehle se registered hai.)';
+              error_log("Email already exists: " . $email);
             } else {
+              error_log("Email not found, checking username");
               $checkUsername = $mysqli->prepare("SELECT id FROM users WHERE username=? LIMIT 1");
               $checkUsername->bind_param('s', $username);
               $checkUsername->execute();
@@ -183,12 +217,30 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
                   
                   $mysqli->commit();
                   
-                  // Set success message for the approval page
-                  $_SESSION['flash'] = 'Registration successful! Your account is pending admin approval. You will be notified once approved.';
+                  // Automatically log in the user after successful registration
+                  $_SESSION['user_id'] = (int)$uid;
+                  $_SESSION['username'] = $name;
+                  $_SESSION['email'] = $email;
+                  $_SESSION['is_admin'] = 0;
+                  $_SESSION['status'] = 'pending';
+                  $_SESSION['email_verified'] = 0;
+                  $_SESSION['role'] = 'user';
                   
-                  // Redirect to pending approval page
-                  header('Location: /pending_approval.php?email=' . urlencode($email));
-                  exit;
+                  // Send OTP verification email
+                  $otp_sent = otp_send_verification_email($uid, $email, $name);
+                  
+                  if ($otp_sent) {
+                      $_SESSION['flash'] = 'Registration successful! Please check your email for the verification code to complete your account setup.';
+                      error_log("Registration SUCCESS! User ID: " . $uid . " - OTP sent, redirecting to email verification");
+                      header('Location: /pending_approval.php?email=' . urlencode($email) . '&otp=1');
+                      exit;
+                  } else {
+                      // OTP email failed, but still show success (user can request OTP later)
+                      $_SESSION['flash'] = 'Registration successful! Please check your email for the verification code. If you don\'t receive it, you can request a new one.';
+                      error_log("Registration SUCCESS! User ID: " . $uid . " - OTP email failed, redirecting to email verification");
+                      header('Location: /pending_approval.php?email=' . urlencode($email) . '&otp=1&email_failed=1');
+                      exit;
+                  }
                   
                 } else {
                   $mysqli->rollback();
@@ -272,6 +324,14 @@ $hideNav = true; include __DIR__ . '/header.php';
 ?>
 <div style="max-width:720px;margin:28px auto;padding:26px;background:#fff;border-radius:12px;box-shadow:0 10px 30px rgba(16,24,40,.06)">
   <h2 style="margin:0 0 6px;color:#222">📝 Create account</h2>
+  
+  <?php if($db_error): ?>
+    <div style="background:#fff3cd;border:1px solid #ffeaa7;color:#856404;padding:10px;border-radius:8px;margin:12px 0">
+      <strong>⚠️ System Status:</strong> Database connection issues detected. Registration may be temporarily unavailable. 
+      <span style="font-size:12px;display:block;margin-top:5px;color:#6c757d;">Admin has been notified. Please try again in a few minutes.</span>
+    </div>
+  <?php endif; ?>
+  
   <?php if($ok): ?>
     <div style="background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;padding:10px;border-radius:8px;margin:12px 0"><?=h($ok)?></div>
   <?php endif; ?>
@@ -296,9 +356,11 @@ $hideNav = true; include __DIR__ . '/header.php';
     </div>
     <label style="display:block;margin-top:12px;font-weight:600">Password</label>
     <input name="password" type="password" minlength="8" required
+           value="<?=h($val['password'])?>"
            style="width:100%;padding:12px;border:1px solid #e6e9ef;border-radius:8px">
     <label style="display:block;margin-top:12px;font-weight:600">Confirm password</label>
     <input name="confirm" type="password" minlength="8" required
+           value="<?=h($val['confirm'])?>"
            style="width:100%;padding:12px;border:1px solid #e6e9ef;border-radius:8px">
     
     <!-- Compact Legal Consents -->
@@ -337,7 +399,7 @@ $hideNav = true; include __DIR__ . '/header.php';
     
     <button type="submit" id="createAccountBtn" disabled
             style="margin-top:16px;background:linear-gradient(90deg,#999,#999);color:#fff;padding:12px;border-radius:8px;border:0;font-weight:700;width:100%;cursor:not-allowed;opacity:0.6">
-      Create Account
+      <?= $db_error ? 'Database Unavailable - Try Later' : 'Create Account' ?>
     </button>
     <div id="submitHint" style="margin-top:8px;color:#666;font-size:12px;text-align:center;">
       Please accept all required terms to enable account creation
@@ -432,6 +494,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Form submission handler with validation
   if (form) {
     form.addEventListener('submit', function(e) {
+      console.log('Form submit triggered');
+      
       // Check if all required fields are filled
       const name = document.querySelector('input[name="name"]').value.trim();
       const email = document.querySelector('input[name="email"]').value.trim();
@@ -439,9 +503,12 @@ document.addEventListener('DOMContentLoaded', function() {
       const password = document.querySelector('input[name="password"]').value;
       const confirm = document.querySelector('input[name="confirm"]').value;
       
+      console.log('Field values:', { name, email, username, password: password ? '***' : 'empty', confirm: confirm ? '***' : 'empty' });
+      
       if (!name || !email || !username || !password || !confirm) {
         e.preventDefault();
         alert('Please fill in all required fields.');
+        console.log('Validation failed: missing fields');
         return false;
       }
       
@@ -449,15 +516,22 @@ document.addEventListener('DOMContentLoaded', function() {
       if (password !== confirm) {
         e.preventDefault();
         alert('Passwords do not match. Please check and try again.');
+        console.log('Validation failed: password mismatch');
         return false;
       }
       
       // Check if all required checkboxes are checked
-      if (!checkAllRequired()) {
+      const allRequiredChecked = checkAllRequired();
+      console.log('All required checkboxes checked:', allRequiredChecked);
+      
+      if (!allRequiredChecked) {
         e.preventDefault();
         alert('Please accept all required terms and conditions.');
+        console.log('Validation failed: missing checkboxes');
         return false;
       }
+      
+      console.log('All validations passed, allowing form submission');
       
       // Show loading state
       submitBtn.disabled = true;
