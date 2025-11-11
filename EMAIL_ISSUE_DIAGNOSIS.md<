@@ -1,0 +1,53 @@
+## OTP Email Issue Diagnosis & Solution
+
+### Problem Identified
+The OTP emails are not being received because they're being sent via PHP's unreliable `mail()` function instead of the configured SMTP server.
+
+### Evidence from Logs
+- ✅ SMTP works: `SMTP send SUCCESS: to=shaikhoo555@gmail.com`
+- ❌ Most emails use `mail()`: `via=mail()` instead of `via=SMTP`
+- ❌ `mail()` function often gets blocked by email providers
+
+### Root Cause
+The PHPMailer library is not properly loaded, causing the system to fall back to unreliable PHP mail().
+
+### Solution Options
+
+#### Option 1: Install PHPMailer (Recommended)
+```bash
+cd /Users/shaikhoology/Desktop/LIVE TC
+composer require phpmailer/phpmailer
+```
+
+#### Option 2: Force SMTP Fallback in mailer.php
+Add this to mailer.php to prevent fallback to mail():
+
+```php
+// At top of mailer.php, after class checks:
+$isProduction = defined('APP_ENV') && APP_ENV === 'prod';
+if ($isProduction && $hasSMTP) {
+    // Force SMTP in production
+} else if (!$hasSMTP) {
+    throw new Exception('SMTP not configured in production environment');
+}
+```
+
+#### Option 3: Use a reliable email service
+Consider using:
+- SendGrid
+- Mailgun  
+- AWS SES
+- Hostinger's built-in email API
+
+### Immediate Fix for Registration Flow
+Since registration is working, but OTP emails are not being received, users can:
+
+1. **Manually verify their email address** by checking the pending_approval page
+2. **Check spam/junk folders** for verification emails
+3. **Use the "Resend OTP"** feature on the pending_approval page
+
+### Testing
+Visit `/test_otp_email.php` to test the email system and see detailed diagnostics.
+
+### Recommendation
+Install PHPMailer via Composer to ensure reliable SMTP email delivery for all OTP and notification emails.

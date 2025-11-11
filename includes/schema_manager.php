@@ -1,38 +1,37 @@
 <?php
 // includes/schema_manager.php - Complete Website-wide Schema Management System
-// Hybrid Detection + Manual Trigger approach
+// Dynamic configuration-based schema validation
 
 class SchemaManager {
     private $mysqli;
     private $admin_mode;
+    private $schema_config;
     
     public function __construct($mysqli, $admin_mode = false) {
         $this->mysqli = $mysqli;
         $this->admin_mode = $admin_mode;
+        
+        // Load schema configuration
+        $config_file = __DIR__ . '/schema_config.php';
+        if (file_exists($config_file)) {
+            $this->schema_config = include $config_file;
+        } else {
+            $this->schema_config = [];
+        }
     }
     
     /**
-     * Main detection method - call this from any page
+     * Main detection method - checks all tables from configuration
      */
     public function detectIssues($show_admin_panel = false) {
         $issues = [];
         
-        // Check trades table
-        $trades_issues = $this->checkTradesTable();
-        if (!empty($trades_issues)) {
-            $issues['trades'] = $trades_issues;
-        }
-        
-        // Check users table  
-        $users_issues = $this->checkUsersTable();
-        if (!empty($users_issues)) {
-            $issues['users'] = $users_issues;
-        }
-        
-        // Check other critical tables
-        $other_issues = $this->checkOtherTables();
-        if (!empty($other_issues)) {
-            $issues['other'] = $other_issues;
+        // Check each table defined in schema_config.php
+        foreach ($this->schema_config as $table_name => $table_config) {
+            $table_issues = $this->checkTable($table_name, $table_config);
+            if (!empty($table_issues)) {
+                $issues[$table_name] = $table_issues;
+            }
         }
         
         // Show admin panel if requested and issues exist
@@ -44,119 +43,72 @@ class SchemaManager {
     }
     
     /**
-     * Check trades table for missing columns
+     * Check a single table against its configuration
      */
-    private function checkTradesTable() {
-        $issues = [];
-        $required_columns = [
-            'entry_price' => 'DECIMAL(10,2) DEFAULT 0.00 COMMENT "Entry price of the trade"',
-            'exit_price' => 'DECIMAL(10,2) DEFAULT 0.00 COMMENT "Exit price of the trade"',
-            'pl_percent' => 'DECIMAL(5,2) DEFAULT 0.00 COMMENT "Profit/Loss percentage"',
-            'outcome' => 'VARCHAR(50) DEFAULT "OPEN" COMMENT "Trade outcome (OPEN/CLOSED/WIN/LOSS)"',
-            'entry_date' => 'DATE NULL COMMENT "Date when trade was entered"',
-            'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT "Record creation time"'
-        ];
-        
-        foreach ($required_columns as $col => $definition) {
-            if (!$this->columnExists('trades', $col)) {
-                $issues[] = [
-                    'type' => 'missing_column',
-                    'table' => 'trades',
-                    'column' => $col,
-                    'definition' => $definition,
-                    'sql' => "ALTER TABLE trades ADD COLUMN {$col} {$definition};"
-                ];
-            }
-        }
-        
-        // Check for required indexes
-        if (!$this->indexExists('trades', 'idx_user_id')) {
-            $issues[] = [
-                'type' => 'missing_index',
-                'table' => 'trades', 
-                'index' => 'idx_user_id',
-                'sql' => "CREATE INDEX idx_user_id ON trades(user_id);"
-            ];
-        }
-        
-        return $issues;
-    }
-    
-    /**
-     * Check users table for missing columns
-     */
-    private function checkUsersTable() {
-        $issues = [];
-        $required_columns = [
-            'trading_capital' => 'DECIMAL(12,2) DEFAULT 100000.00 COMMENT "Available trading capital"',
-            'status' => 'ENUM("pending","active","approved","suspended") DEFAULT "pending" COMMENT "Account status"',
-            'email_verified' => 'TINYINT(1) DEFAULT 0 COMMENT "Whether email is verified"',
-            'created_at' => 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT "Account creation time"',
-            'updated_at' => 'TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP COMMENT "Last update time"'
-        ];
-        
-        foreach ($required_columns as $col => $definition) {
-            if (!$this->columnExists('users', $col)) {
-                $issues[] = [
-                    'type' => 'missing_column',
-                    'table' => 'users',
-                    'column' => $col,
-                    'definition' => $definition,
-                    'sql' => "ALTER TABLE users ADD COLUMN {$col} {$definition};"
-                ];
-            }
-        }
-        
-        return $issues;
-    }
-    
-    /**
-     * Check other critical tables
-     */
-    private function checkOtherTables() {
+    private function checkTable($table_name, $table_config) {
         $issues = [];
         
-        // Check if deploy_notes table exists and has right structure
-        if (!$this->tableExists('deploy_notes')) {
+        // Check if table exists
+        if (!$this->tableExists($table_name)) {
             $issues[] = [
                 'type' => 'missing_table',
-                'table' => 'deploy_notes',
-                'sql' => $this->getDeployNotesTableSQL()
+                'table' => $table_name,
+                'sql' => $this->generateCreateTableSQL($table_name, $table_config)
             ];
+            return $issues; // If table doesn't exist, no point checking columns
+        }
+        
+        // Check each required column
+        if (isset($table_config['columns'])) {
+            foreach ($table_config['columns'] as $column_name => $column_definition) {
+                if (!$this->columnExists($table_name, $column_name)) {
+                    $issues[] = [
+                        'type' => 'missing_column',
+                        'table' => $table_name,
+                        'column' => $column_name,
+                        'definition' => $column_definition,
+                        'sql' => "ALTER TABLE `{$table_name}` ADD COLUMN `{$column_name}` {$column_definition}"
+                    ];
+                }
+            }
+        }
+        
+        // Check indexes
+        if (isset($table_config['indexes'])) {
+            foreach ($table_config['indexes'] as $index_name => $index_columns) {
+                if (!$this->indexExists($table_name, $index_name)) {
+                    $issues[] = [
+                        'type' => 'missing_index',
+                        'table' => $table_name,
+                        'index' => $index_name,
+                        'sql' => "CREATE INDEX `{$index_name}` ON `{$table_name}`({$index_columns})"
+                    ];
+                }
+            }
         }
         
         return $issues;
     }
     
     /**
-     * Generate SQL for deploy_notes table
+     * Generate CREATE TABLE SQL from configuration
      */
-    private function getDeployNotesTableSQL() {
-        return "CREATE TABLE IF NOT EXISTS deploy_notes (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          env ENUM('local','staging','prod') NOT NULL DEFAULT 'prod',
-          title VARCHAR(255) NOT NULL,
-          body TEXT NULL,
-          note_type ENUM('feature','hotfix','migration','maintenance') DEFAULT 'feature',
-          impact ENUM('low','medium','high','critical') DEFAULT 'low',
-          status ENUM('planned','in_progress','deployed','rolled_back') DEFAULT 'planned',
-          sql_up MEDIUMTEXT NULL,
-          sql_down MEDIUMTEXT NULL,
-          files_json JSON NULL,
-          links_json JSON NULL,
-          tags VARCHAR(255) NULL,
-          created_by INT NOT NULL,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-          deployed_at DATETIME NULL,
-          INDEX idx_env (env),
-          INDEX idx_status (status),
-          INDEX idx_type (note_type),
-          INDEX idx_created_by (created_by),
-          INDEX idx_created_at (created_at),
-          INDEX idx_deployed_at (deployed_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
+    private function generateCreateTableSQL($table_name, $table_config) {
+        $sql = "CREATE TABLE IF NOT EXISTS `{$table_name}` (\n";
+        
+        $column_defs = [];
+        if (isset($table_config['columns'])) {
+            foreach ($table_config['columns'] as $column_name => $column_definition) {
+                $column_defs[] = "  `{$column_name}` {$column_definition}";
+            }
+        }
+        
+        $sql .= implode(",\n", $column_defs);
+        $sql .= "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4";
+        
+        return $sql;
     }
+    
     
     /**
      * Execute fixes - this modifies your phpMyAdmin database directly

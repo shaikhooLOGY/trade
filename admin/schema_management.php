@@ -75,7 +75,10 @@ $issues = $schema->detectIssues(false);
 
 <div class="container">
   <div class="header">
-    <h1 style="margin: 0; color: #1f2937;">🔧 Database Schema Management</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <h1 style="margin: 0; color: #1f2937;">🔧 Database Schema Management</h1>
+      <a href="profile_manager.php" class="btn btn-primary" style="text-decoration: none;">👤 Profile Manager</a>
+    </div>
     <p style="color: #6b7280; margin: 8px 0 0 0;">Monitor and fix database schema issues across your website</p>
   </div>
 

@@ -38,42 +38,7 @@ return [
         ]
     ],
     
-    // Section 2: Educational Background
-    'education' => [
-        'title' => 'Educational Background',
-        'description' => 'Your educational qualifications',
-        'fields' => [
-            'education_level' => [
-                'label' => 'Highest Education Level',
-                'type' => 'select',
-                'required' => true,
-                'options' => [
-                    '' => 'Select Education Level',
-                    'high_school' => 'High School',
-                    'bachelor' => 'Bachelor\'s Degree',
-                    'master' => 'Master\'s Degree',
-                    'phd' => 'PhD',
-                    'other' => 'Other'
-                ]
-            ],
-            'institution' => [
-                'label' => 'Institution/University',
-                'type' => 'text',
-                'required' => false,
-                'placeholder' => 'Name of your educational institution'
-            ],
-            'graduation_year' => [
-                'label' => 'Graduation Year',
-                'type' => 'number',
-                'required' => false,
-                'min' => 1950,
-                'max' => date('Y') + 5,
-                'placeholder' => 'Year of graduation'
-            ]
-        ]
-    ],
-    
-    // Section 3: Trading Experience
+    // Section 2: Trading Experience
     'trading_experience' => [
         'title' => 'Trading Experience',
         'description' => 'Your trading background and experience',

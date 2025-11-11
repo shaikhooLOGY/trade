@@ -164,9 +164,70 @@ if (!$err_msgs && $user && isset($_POST['verify']) && isset($_POST['csrf']) && h
         if ($code === '' || strlen($code) !== 6) {
             $err_msgs[] = "Please enter a 6-digit code. (6 huroof ka code daliyé.)";
         } else {
-            $db_code = (string)($user['otp_code'] ?? '');
-            $db_exp  = (string)($user['otp_expires'] ?? '');
-            $isValid = ($code === $db_code) && $db_exp && (strtotime($db_exp) > time());
+            $isValid = false;
+            
+            // Method 1: Check user_otps table (new system)
+            error_log("verify_profile.php: Method 1 - Attempting database verification");
+            try {
+                // Simple query with basic columns that should exist
+                $st = $mysqli->prepare("SELECT id, otp_hash, expires_at FROM user_otps WHERE user_id=? AND expires_at > NOW() ORDER BY created_at DESC LIMIT 1");
+                if ($st === false) {
+                    error_log("verify_profile.php: Method 1 - FAILED: SQL prepare failed: " . $mysqli->error);
+                } else {
+                    $st->bind_param('i', $user['id']);
+                    $st->execute();
+                    $result = $st->get_result();
+                    $otp_record = $result->fetch_assoc();
+                    $st->close();
+                    
+                    error_log("verify_profile.php: Method 1 - OTP record found: " . ($otp_record ? "YES" : "NO"));
+                    if ($otp_record) {
+                        error_log("verify_profile.php: Method 1 - id: " . $otp_record['id'] . ", expires_at: " . $otp_record['expires_at']);
+                        error_log("verify_profile.php: Method 1 - code: $code");
+                    }
+                    
+                    if ($otp_record) {
+                        if (password_verify($code, $otp_record['otp_hash'])) {
+                            $isValid = true;
+                            error_log("verify_profile.php: Method 1 - SUCCESS: password_verify matched");
+                            // Mark OTP as used (simple update)
+                            $update_stmt = $mysqli->prepare("UPDATE user_otps SET email_sent_at=NULL WHERE id=?");
+                            if ($update_stmt) {
+                                $update_stmt->bind_param('i', $otp_record['id']);
+                                $update_stmt->execute();
+                                $update_stmt->close();
+                            }
+                        } else {
+                            error_log("verify_profile.php: Method 1 - FAILED: password_verify failed");
+                        }
+                    } else {
+                        error_log("verify_profile.php: Method 1 - FAILED: no valid OTP record found");
+                    }
+                }
+            } catch (Exception $e) {
+                error_log("verify_profile.php: Method 1 - Exception: " . $e->getMessage());
+            }
+            
+            // Method 2: Check session fallback (register1.php)
+            if (!$isValid) {
+                error_log("verify_profile.php: Method 2 - checking session");
+                error_log("verify_profile.php: Method 2 - session vars: register_otp=" . (isset($_SESSION['register_otp']) ? "SET" : "NOT SET") . ", user_id=" . ($_SESSION['register_otp_user_id'] ?? "NOT SET") . ", expires=" . ($_SESSION['register_otp_expires'] ?? "NOT SET"));
+                error_log("verify_profile.php: Method 2 - expected user_id=" . $user['id'] . ", session user_id=" . ($_SESSION['register_otp_user_id'] ?? "NOT SET"));
+                error_log("verify_profile.php: Method 2 - current time=" . time() . ", expiry time=" . ($_SESSION['register_otp_expires'] ?? "NOT SET"));
+            }
+            
+            if (!$isValid && isset($_SESSION['register_otp']) && $_SESSION['register_otp_user_id'] == $user['id'] && $_SESSION['register_otp_expires'] > time()) {
+                if ($code === $_SESSION['register_otp']) {
+                    $isValid = true;
+                    error_log("verify_profile.php: Method 2 - SUCCESS: session match");
+                    // Clear session OTP
+                    unset($_SESSION['register_otp'], $_SESSION['register_otp_user_id'], $_SESSION['register_otp_expires']);
+                } else {
+                    error_log("verify_profile.php: Method 2 - FAILED: session code mismatch. Expected: " . $_SESSION['register_otp'] . ", Got: $code");
+                }
+            } else if (!$isValid) {
+                error_log("verify_profile.php: Method 2 - FAILED: session conditions not met");
+            }
 
             if (!$isValid) {
                 // Track failed attempt
@@ -177,7 +238,7 @@ if (!$err_msgs && $user && isset($_POST['verify']) && isset($_POST['csrf']) && h
                 unset($_SESSION['otp_attempts']);
                 
                 // mark verified but keep status pending for admin approval
-                if ($up = $mysqli->prepare("UPDATE users SET email_verified=1, status='pending', otp_code=NULL, otp_expires=NULL WHERE id=?")) {
+                if ($up = $mysqli->prepare("UPDATE users SET email_verified=1, status='pending' WHERE id=?")) {
                     $up->bind_param('i', $user['id']);
                     if ($up->execute()) {
                         $up->close();

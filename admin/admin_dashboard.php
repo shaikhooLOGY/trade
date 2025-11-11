@@ -1,6 +1,7 @@
 <?php
 // admin/admin_dashboard.php
 require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../includes/functions.php';
 if (session_status() === PHP_SESSION_NONE) session_start();
 if (empty($_SESSION['is_admin'])) { header('HTTP/1.1 403 Forbidden'); exit('Access denied'); }
 require_once __DIR__ . '/../includes/bootstrap.php';
@@ -192,22 +193,13 @@ include __DIR__ . '/../header.php';
   </div>
 
   <div class="row">
-    <!-- User Registration Management -->
-    <div class="card" onclick="window.location='users.php?filter=new_registrations'">
+    <!-- User Management -->
+    <div class="card" onclick="window.location='user_manager.php'">
       <div class="card-content">
-        <h3>🎯 User Registration Workflow</h3>
-        <p>Review new user registrations, OTP verification, and profile completion status.</p>
-        <a href="users.php?filter=new_registrations" class="btn">View Registrations</a>
+        <h3>👥 User Management</h3>
+        <p>Manage all registered users, review registrations, approve, deactivate, or modify user accounts.</p>
+        <a href="user_manager.php" class="btn">Manage Users</a>
         <?php if ($stats['awaiting_approval'] > 0) echo "<span class='badge'>{$stats['awaiting_approval']} Awaiting</span>"; ?>
-      </div>
-    </div>
-
-    <!-- Users -->
-    <div class="card" onclick="window.location='users.php'">
-      <div class="card-content">
-        <h3>👥 All Users</h3>
-        <p>Manage all registered users, approve, deactivate, or modify user accounts.</p>
-        <a href="users.php" class="btn">Manage Users</a>
       </div>
     </div>
 
@@ -221,12 +213,12 @@ include __DIR__ . '/../header.php';
       </div>
     </div>
 
-    <!-- Profile Fields -->
-    <div class="card" onclick="window.location='view_profile_fields.php'">
+    <!-- Profile Manager -->
+    <div class="card" onclick="window.location='profile_manager.php'">
       <div class="card-content">
-        <h3>📝 Profile Fields</h3>
-        <p>View current user profile requirements and configuration.</p>
-        <a href="view_profile_fields.php" class="btn">View Fields</a>
+        <h3>🎛️ Profile Manager</h3>
+        <p>Manage profile fields, add/edit sections, view fields, and sync database schema.</p>
+        <a href="profile_manager.php" class="btn">Manage Fields</a>
       </div>
     </div>
 
